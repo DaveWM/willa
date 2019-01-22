@@ -2,7 +2,7 @@
   (:require [jackdaw.streams :as streams]
             [jackdaw.serdes.edn :as serdes.edn])
   (:import (jackdaw.streams.interop CljKTable CljKStream CljKGroupedTable)
-           (org.apache.kafka.streams.kstream Transformer SessionWindows TimeWindows)
+           (org.apache.kafka.streams.kstream Transformer SessionWindows TimeWindows KTable)
            (org.apache.kafka.streams.processor ProcessorContext)))
 
 
@@ -130,3 +130,10 @@
   (cond
     (instance? SessionWindows window) (streams/window-by-session kgroupedstream window)
     (instance? TimeWindows window) (streams/window-by-time kgroupedstream window)))
+
+
+;; TODO replace with Jackdaw implementation once https://github.com/FundingCircle/jackdaw/pull/23 has been merged & released
+(defn suppress [ktable suppression]
+  (jackdaw.streams.interop/clj-ktable
+    (^KTable .suppress (jackdaw.streams.protocols/ktable* ktable)
+                       suppression)))

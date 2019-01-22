@@ -90,12 +90,13 @@
                             (->groupable builder (get entities (first parents)))
                             (join-entities builder (get-join joins parents) entities))]
     (assoc entity :ktable (cond-> ktable-or-kstream
-                                  (:window-by entity) (streams/to-kstream)
+                                  (:window-by entity) (ws/coerce-to-kstream)
                                   (:group-by entity) (streams/group-by (:group-by entity) ws/default-serdes)
                                   (:window-by entity) (ws/window-by (:window-by entity))
                                   (:aggregate-adder entity) (ws/aggregate (:initial-value entity)
                                                                        (:aggregate-adder entity)
-                                                                       (:aggregate-subtractor entity))))))
+                                                                       (:aggregate-subtractor entity))
+                                  (:suppression entity) (ws/suppress (:suppression entity))))))
 
 
 (defn build-workflow! [builder {:keys [workflow entities joins]}]

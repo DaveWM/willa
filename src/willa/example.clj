@@ -5,7 +5,8 @@
             [loom.graph :as l]
             [willa.streams :as ws]
             [willa.workflow :as ww])
-  (:import (org.apache.kafka.streams.kstream JoinWindows)))
+  (:import (org.apache.kafka.streams.kstream JoinWindows Suppressed Suppressed$BufferConfig TimeWindows)
+           (java.time Duration)))
 
 
 (def app-config
@@ -43,7 +44,8 @@
   (concat
     [[:topics/input-topic :stream]
      [:topics/secondary-input-topic :stream]]
-    (ww/with-dedupe "stream-dedupe" :stream :topics/output-topic)))
+    (ww/with-dedupe "stream-dedupe" :stream :suppressed-table)
+    [[:suppressed-table :topics/output-topic]]))
 
 (def entities
   (merge {:topics/input-topic (assoc input-topic :type :topic)
@@ -52,16 +54,16 @@
           :topics/output-topic (assoc output-topic :type :topic)
           :topics/secondary-output-topic (assoc secondary-output-topic :type :topic)
           :stream {:type :kstream
-                   :xform (map (wu/transform-value inc))}
-          :table {:type :ktable
-                  :group-by (fn [[k v]]
-                              [v (count k)])
-                  :aggregate-adder (fn [acc [k v]]
-                                     (+ acc v))
-                  :aggregate-subtractor (fn [acc [k v]]
-                                          (- acc v))
-                  :initial-value 0}}
-         (ww/dedupe-entities "stream-dedupe")))
+                   :xform (map (wu/transform-value (fn [v]
+                                                     (inc #spy/p v))))}}
+         (ww/dedupe-entities "stream-dedupe")
+         {:suppressed-table {:type :ktable
+                             :group-by (fn [[k v]] k)
+                             :initial-value 0
+                             :aggregate-adder (fn [acc [k v]]
+                                                #spy/p (+ acc v))
+                             :window-by (.grace (TimeWindows/of 10000) (Duration/ofMillis 10000))
+                             :suppression (Suppressed/untilWindowCloses (Suppressed$BufferConfig/unbounded))}}))
 
 (def joins
   {[:topics/input-topic :topics/secondary-input-topic] {:type :merge
@@ -100,7 +102,7 @@
 
   (def producer (jackdaw.client/producer app-config
                                          willa.streams/default-serdes))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 1))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 15))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord secondary-input-topic "key" 2))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord tertiary-input-topic "key" 3))
 
