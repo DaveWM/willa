@@ -69,6 +69,12 @@
   (streams/outer-join-windowed kstream other join-fn (:window join-config)
                                default-serdes default-serdes))
 
+
+(defmethod join*
+  [:merge CljKStream CljKStream]
+  [_ kstream other _]
+  (streams/merge kstream other))
+
 (defmethod join*
   [:inner CljKTable CljKTable]
   [_ ktable other join-fn]
@@ -85,7 +91,7 @@
   (streams/outer-join ktable other join-fn))
 
 (defmethod join*
-  [:outer CljKStream CljKTable]
+  [:left CljKStream CljKTable]
   [_ kstream ktable join-fn]
   (streams/left-join kstream ktable join-fn default-serdes default-serdes))
 

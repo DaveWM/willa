@@ -2,7 +2,6 @@
   (:require [jackdaw.streams :as streams]
             [willa.core :as w]
             [willa.utils :as wu]
-            [jackdaw.serdes.edn :as serdes.edn]
             [loom.graph :as l]
             [willa.streams :as ws])
   (:import (org.apache.kafka.streams.kstream JoinWindows)))
@@ -39,8 +38,9 @@
    secondary-output-topic])
 
 (def workflow
-  [[:topics/input-topic :table]
-   [:table :topics/output-topic]])
+  [[:topics/input-topic :stream]
+   [:topics/secondary-input-topic :stream]
+   [:stream :topics/output-topic]])
 
 (def entities
   {:topics/input-topic (assoc input-topic :type :topic)
@@ -49,8 +49,7 @@
    :topics/output-topic (assoc output-topic :type :topic)
    :topics/secondary-output-topic (assoc secondary-output-topic :type :topic)
    :stream {:type :kstream
-            :xform (map (wu/transform-value (fn [v]
-                                              (apply + (remove nil? v)))))}
+            :xform (map (wu/transform-value inc))}
    :table {:type :ktable
            :group-by (fn [[k v]]
                        [v (count k)])
@@ -61,31 +60,31 @@
            :initial-value 0}})
 
 (def joins
-  {[:topics/input-topic :topics/secondary-input-topic :topics/tertiary-input-topic] {:type :inner
-                                                                                     :window (JoinWindows/of 10000)}})
+  {[:topics/input-topic :topics/secondary-input-topic] {:type :merge
+                                                        :window (JoinWindows/of 10000)}})
 
 
 (defn start! []
-  (doto (streams/kafka-streams (w/build-workflow!
-                                 (streams/streams-builder)
-                                 {:workflow workflow
-                                  :entities entities
-                                  :joins joins})
-                               app-config)
-    (.setUncaughtExceptionHandler (reify Thread$UncaughtExceptionHandler
-                                    (uncaughtException [_ t e]
-                                      (println e))))
-    streams/start))
+  (let [builder        (streams/streams-builder)
+        built-entities (w/build-workflow!
+                         builder
+                         {:workflow workflow
+                          :entities entities
+                          :joins joins})]
+    (doto (streams/kafka-streams builder
+                                 app-config)
+      (.setUncaughtExceptionHandler (reify Thread$UncaughtExceptionHandler
+                                      (uncaughtException [_ t e]
+                                        (println e))))
+      streams/start)))
 
 (comment
 
-  (jackdaw.client/subscribe consumer [output-topic])
-  (jackdaw.client/seek-to-beginning-eager consumer)
-  (map (juxt :key :value) (jackdaw.client/poll consumer 1000))
-
-
   (require 'jackdaw.client
-           'jackdaw.admin)
+           'jackdaw.admin
+           '[clojure.core.async :as a]
+           'loom.io)
+
   (def admin-client (jackdaw.admin/->AdminClient app-config))
   (jackdaw.admin/create-topics! admin-client topics)
   (jackdaw.admin/list-topics admin-client)
@@ -97,19 +96,19 @@
 
   (def producer (jackdaw.client/producer app-config
                                          willa.streams/default-serdes))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "a" 2))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord secondary-input-topic "key" 2))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 1))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord secondary-input-topic "key2" 2))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord tertiary-input-topic "key" 3))
 
 
   (def consumer (jackdaw.client/consumer (assoc app-config "group.id" "consumer")
                                          willa.streams/default-serdes))
+  (jackdaw.client/subscribe consumer [output-topic])
+  (do (jackdaw.client/seek-to-beginning-eager consumer)
+      (map (juxt :key :value) (jackdaw.client/poll consumer 200)))
 
-
-  (require 'loom.io)
   (loom.io/view (apply l/digraph workflow))
 
-  (require '[clojure.core.async :as a])
   (defn reset []
     (streams/close app)
     (a/<!! (a/timeout 100))
