@@ -51,6 +51,9 @@
   (entity->ktable builder entity))
 
 
+(def ->groupable ->joinable)
+
+
 (defn get-join [joins parents]
   (->> joins
        (filter (fn [[k _]] (= (set k) parents)))
@@ -84,7 +87,7 @@
 
 (defmethod build-entity :ktable [entity builder parents entities joins]
   (let [ktable-or-kstream (if (wu/single-elem? parents)
-                            (entity->ktable builder (get entities (first parents)))
+                            (->groupable builder (get entities (first parents)))
                             (join-entities builder (get-join joins parents) entities))]
     (assoc entity :ktable (cond-> ktable-or-kstream
                                   (:window-by entity) (streams/to-kstream)

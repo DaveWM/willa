@@ -27,7 +27,7 @@
 
 (defmethod coerce-to-ktable CljKStream [kstream]
   (-> kstream
-      (streams/group-by-key)
+      (streams/group-by-key default-serdes)
       (streams/reduce (fn [_ x] x) (merge {:topic-name (str (gensym))}
                                           default-serdes))))
 

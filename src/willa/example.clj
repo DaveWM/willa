@@ -3,7 +3,8 @@
             [willa.core :as w]
             [willa.utils :as wu]
             [loom.graph :as l]
-            [willa.streams :as ws])
+            [willa.streams :as ws]
+            [willa.workflow :as ww])
   (:import (org.apache.kafka.streams.kstream JoinWindows)))
 
 
@@ -37,27 +38,30 @@
    output-topic
    secondary-output-topic])
 
+
 (def workflow
-  [[:topics/input-topic :stream]
-   [:topics/secondary-input-topic :stream]
-   [:stream :topics/output-topic]])
+  (concat
+    [[:topics/input-topic :stream]
+     [:topics/secondary-input-topic :stream]]
+    (ww/with-dedupe "stream-dedupe" :stream :topics/output-topic)))
 
 (def entities
-  {:topics/input-topic (assoc input-topic :type :topic)
-   :topics/secondary-input-topic (assoc secondary-input-topic :type :topic)
-   :topics/tertiary-input-topic (assoc tertiary-input-topic :type :topic)
-   :topics/output-topic (assoc output-topic :type :topic)
-   :topics/secondary-output-topic (assoc secondary-output-topic :type :topic)
-   :stream {:type :kstream
-            :xform (map (wu/transform-value inc))}
-   :table {:type :ktable
-           :group-by (fn [[k v]]
-                       [v (count k)])
-           :aggregate-adder (fn [acc [k v]]
-                              (+ acc v))
-           :aggregate-subtractor (fn [acc [k v]]
-                                   (- acc v))
-           :initial-value 0}})
+  (merge {:topics/input-topic (assoc input-topic :type :topic)
+          :topics/secondary-input-topic (assoc secondary-input-topic :type :topic)
+          :topics/tertiary-input-topic (assoc tertiary-input-topic :type :topic)
+          :topics/output-topic (assoc output-topic :type :topic)
+          :topics/secondary-output-topic (assoc secondary-output-topic :type :topic)
+          :stream {:type :kstream
+                   :xform (map (wu/transform-value inc))}
+          :table {:type :ktable
+                  :group-by (fn [[k v]]
+                              [v (count k)])
+                  :aggregate-adder (fn [acc [k v]]
+                                     (+ acc v))
+                  :aggregate-subtractor (fn [acc [k v]]
+                                          (- acc v))
+                  :initial-value 0}}
+         (ww/dedupe-entities "stream-dedupe")))
 
 (def joins
   {[:topics/input-topic :topics/secondary-input-topic] {:type :merge
@@ -97,7 +101,7 @@
   (def producer (jackdaw.client/producer app-config
                                          willa.streams/default-serdes))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 1))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord secondary-input-topic "key2" 2))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord secondary-input-topic "key" 2))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord tertiary-input-topic "key" 3))
 
 
