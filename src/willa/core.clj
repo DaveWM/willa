@@ -76,12 +76,12 @@
                                            (apply + (remove nil? v)))))}
    :table {:type :ktable
            :group-by (fn [[k v]]
-                       k)
+                       [v (count k)])
            :aggregate-adder (fn [acc [k v]]
                               (+ acc v))
            :aggregate-subtractor (fn [acc [k v]]
                                    (- acc v))
-           :initial-value 0}})
+           :initial-value 0}})                 
 
 (def joins
   {[:topics/input-topic :topics/secondary-input-topic :topics/tertiary-input-topic] {:type :inner
@@ -137,7 +137,7 @@
 (defn *group-by [kstream-or-ktable group-by-fn]
   (if (instance? CljKStream kstream-or-ktable)
     (streams/group-by kstream-or-ktable group-by-fn default-serdes)
-    (streams/group-by kstream-or-ktable (fn [[k v]] [(group-by-fn [k v]) v]) default-serdes)))
+    (streams/group-by kstream-or-ktable group-by-fn default-serdes)))
 
 
 (defmulti coerce-to-kstream (fn [x]
@@ -286,7 +286,7 @@
                                  (apply join join-config)))]
     (assoc entity :ktable (cond-> ktable-or-kstream
                                   (:window-by entity) (streams/to-kstream)
-                                  (:group-by entity) (*group-by (:group-by entity))
+                                  (:group-by entity) (streams/group-by (:group-by entity) default-serdes)
                                   (:window-by entity) (window-by (:window-by entity))
                                   (:aggregate-adder entity) (aggregate (:initial-value entity)
                                                                        (:aggregate-adder entity)
@@ -330,7 +330,7 @@
 
   (def producer (jackdaw.client/producer app-config
                                          default-serdes))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "test2" 2))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "a" 2))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord secondary-input-topic "key" 2))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord tertiary-input-topic "key" 3))
 
@@ -339,7 +339,7 @@
                                          default-serdes))
   (jackdaw.client/subscribe consumer [output-topic])
   (jackdaw.client/seek-to-beginning-eager consumer)
-  (map :value (jackdaw.client/poll consumer 1000))
+  (map (juxt :key :value) (jackdaw.client/poll consumer 1000))
 
 
   (require 'loom.io)
