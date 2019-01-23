@@ -50,23 +50,23 @@
 
 
 (defmulti join* (fn [join-config kstream-or-ktable other join-fn]
-                  [(:type join-config) (class kstream-or-ktable) (class other)]))
+                  [(:willa.core/join-type join-config) (class kstream-or-ktable) (class other)]))
 (defmethod join*
   [:inner CljKStream CljKStream]
   [join-config kstream other join-fn]
-  (streams/join-windowed kstream other join-fn (:window join-config)
+  (streams/join-windowed kstream other join-fn (:willa.core/window join-config)
                          default-serdes default-serdes))
 
 (defmethod join*
   [:left CljKStream CljKStream]
   [join-config kstream other join-fn]
-  (streams/left-join-windowed kstream other join-fn (:window join-config)
+  (streams/left-join-windowed kstream other join-fn (:willa.core/window join-config)
                               default-serdes default-serdes))
 
 (defmethod join*
   [:outer CljKStream CljKStream]
   [join-config kstream other join-fn]
-  (streams/outer-join-windowed kstream other join-fn (:window join-config)
+  (streams/outer-join-windowed kstream other join-fn (:willa.core/window join-config)
                                default-serdes default-serdes))
 
 

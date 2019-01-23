@@ -48,26 +48,26 @@
     [[:suppressed-table :topics/output-topic]]))
 
 (def entities
-  (merge {:topics/input-topic (assoc input-topic :type :topic)
-          :topics/secondary-input-topic (assoc secondary-input-topic :type :topic)
-          :topics/tertiary-input-topic (assoc tertiary-input-topic :type :topic)
-          :topics/output-topic (assoc output-topic :type :topic)
-          :topics/secondary-output-topic (assoc secondary-output-topic :type :topic)
-          :stream {:type :kstream
-                   :xform (map (wu/transform-value (fn [v]
-                                                     (inc #spy/p v))))}}
+  (merge {:topics/input-topic (assoc input-topic ::w/entity-type :topic)
+          :topics/secondary-input-topic (assoc secondary-input-topic ::w/entity-type :topic)
+          :topics/tertiary-input-topic (assoc tertiary-input-topic ::w/entity-type :topic)
+          :topics/output-topic (assoc output-topic ::w/entity-type :topic)
+          :topics/secondary-output-topic (assoc secondary-output-topic ::w/entity-type :topic)
+          :stream {::w/entity-type :kstream
+                   ::w/xform (map (wu/transform-value (fn [v]
+                                                        (inc v))))}}
          (ww/dedupe-entities "stream-dedupe")
-         {:suppressed-table {:type :ktable
-                             :group-by (fn [[k v]] k)
-                             :initial-value 0
-                             :aggregate-adder (fn [acc [k v]]
-                                                #spy/p (+ acc v))
-                             :window-by (.grace (TimeWindows/of 10000) (Duration/ofMillis 10000))
-                             :suppression (Suppressed/untilWindowCloses (Suppressed$BufferConfig/unbounded))}}))
+         {:suppressed-table {::w/entity-type :ktable
+                             ::w/group-by-fn (fn [[k v]] k)
+                             ::w/aggregate-initial-value 0
+                             ::w/aggregate-adder-fn (fn [acc [k v]]
+                                                      (+ acc v))
+                             ::w/window (.grace (TimeWindows/of 10000) (Duration/ofMillis 10000))
+                             ::w/suppression (Suppressed/untilWindowCloses (Suppressed$BufferConfig/unbounded))}}))
 
 (def joins
-  {[:topics/input-topic :topics/secondary-input-topic] {:type :merge
-                                                        :window (JoinWindows/of 10000)}})
+  {[:topics/input-topic :topics/secondary-input-topic] {::w/join-type :merge
+                                                        ::w/window (JoinWindows/of 10000)}})
 
 
 (defn start! []
@@ -102,7 +102,7 @@
 
   (def producer (jackdaw.client/producer app-config
                                          willa.streams/default-serdes))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 15))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 135))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord secondary-input-topic "key" 2))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord tertiary-input-topic "key" 3))
 

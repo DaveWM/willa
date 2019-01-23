@@ -10,7 +10,7 @@
 
 
 (defmulti entity->kstream (fn [builder entity]
-                            (:type entity)))
+                            (::entity-type entity)))
 
 (defmethod entity->kstream :topic [builder entity]
   (streams/kstream builder entity))
@@ -26,7 +26,7 @@
 
 
 (defmulti entity->ktable (fn [builder entity]
-                           (:type entity)))
+                           (::entity-type entity)))
 
 (defmethod entity->ktable :topic [builder entity]
   (streams/ktable builder entity))
@@ -39,7 +39,7 @@
 
 
 (defmulti ->joinable (fn [builder entity]
-                       (:type entity)))
+                       (::entity-type entity)))
 
 (defmethod ->joinable :topic [builder entity]
   (entity->kstream builder entity))
@@ -67,7 +67,7 @@
 
 
 (defmulti build-entity (fn [entity builder parents entities joins]
-                         (:type entity)))
+                         (::entity-type entity)))
 
 
 (defmethod build-entity :topic [entity builder parents entities _]
@@ -82,7 +82,7 @@
                   (-> (join-entities builder (get-join joins parents) entities)
                       ws/coerce-to-kstream))]
     (assoc entity :kstream (cond-> kstream
-                                   (:xform entity) (ws/transduce-stream (:xform entity))))))
+                                   (::xform entity) (ws/transduce-stream (::xform entity))))))
 
 
 (defmethod build-entity :ktable [entity builder parents entities joins]
@@ -90,19 +90,19 @@
                             (->groupable builder (get entities (first parents)))
                             (join-entities builder (get-join joins parents) entities))]
     (assoc entity :ktable (cond-> ktable-or-kstream
-                                  (:window-by entity) (ws/coerce-to-kstream)
-                                  (:group-by entity) (streams/group-by (:group-by entity) ws/default-serdes)
-                                  (:window-by entity) (ws/window-by (:window-by entity))
-                                  (:aggregate-adder entity) (ws/aggregate (:initial-value entity)
-                                                                       (:aggregate-adder entity)
-                                                                       (:aggregate-subtractor entity))
-                                  (:suppression entity) (ws/suppress (:suppression entity))))))
+                                  (::window entity) (ws/coerce-to-kstream)
+                                  (::group-by-fn entity) (streams/group-by (::group-by-fn entity) ws/default-serdes)
+                                  (::window entity) (ws/window-by (::window entity))
+                                  (::aggregate-adder-fn entity) (ws/aggregate (::aggregate-initial-value entity)
+                                                                              (::aggregate-adder-fn entity)
+                                                                              (::aggregate-subtractor-fn entity))
+                                  (::suppression entity) (ws/suppress (::suppression entity))))))
 
 
 (defn build-workflow! [builder {:keys [workflow entities joins]}]
-  (let [g     (apply l/digraph workflow)
-        nodes (lalg/topsort g)]
-    (->> nodes
+  (let [g (apply l/digraph workflow)]
+    (->> g
+         (lalg/topsort)
          (map (juxt identity (partial l/predecessors g)))
          (reduce (fn [built-entities [node parents]]
                    (update built-entities node build-entity builder parents built-entities joins))
