@@ -45,8 +45,7 @@
   (concat
     [[:topics/input-topic :stream]
      [:topics/secondary-input-topic :stream]]
-    (ww/with-dedupe "stream-dedupe" :stream :suppressed-table)
-    [[:suppressed-table :topics/output-topic]]))
+    (ww/with-dedupe "stream-dedupe" :stream :topics/output-topic)))
 
 (def entities
   (merge {:topics/input-topic (assoc input-topic ::w/entity-type :topic)
@@ -55,8 +54,7 @@
           :topics/output-topic (assoc output-topic ::w/entity-type :topic)
           :topics/secondary-output-topic (assoc secondary-output-topic ::w/entity-type :topic)
           :stream {::w/entity-type :kstream
-                   ::w/xform (map (wu/transform-value (fn [v]
-                                                        (inc v))))}}
+                   ::w/xform (map (wu/transform-value inc))}}
          (ww/dedupe-entities "stream-dedupe")
          {:suppressed-table {::w/entity-type :ktable
                              ::w/group-by-fn (fn [[k v]] k)
@@ -102,7 +100,7 @@
 
   (def producer (jackdaw.client/producer app-config
                                          willa.streams/default-serdes))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 135))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 3))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord secondary-input-topic "key" 2))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord tertiary-input-topic "key" 3))
 
