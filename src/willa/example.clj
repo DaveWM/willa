@@ -4,7 +4,8 @@
             [willa.utils :as wu]
             [loom.graph :as l]
             [willa.streams :as ws]
-            [willa.workflow :as ww])
+            [willa.workflow :as ww]
+            [willa.viz :as wv])
   (:import (org.apache.kafka.streams.kstream JoinWindows Suppressed Suppressed$BufferConfig TimeWindows)
            (java.time Duration)))
 
@@ -88,8 +89,7 @@
 
   (require 'jackdaw.client
            'jackdaw.admin
-           '[clojure.core.async :as a]
-           'loom.io)
+           '[clojure.core.async :as a])
 
   (def admin-client (jackdaw.admin/->AdminClient app-config))
   (jackdaw.admin/create-topics! admin-client topics)
@@ -113,7 +113,7 @@
   (do (jackdaw.client/seek-to-beginning-eager consumer)
       (map (juxt :key :value) (jackdaw.client/poll consumer 200)))
 
-  (loom.io/view (apply l/digraph workflow))
+  (wv/view-workflow workflow entities)
 
   (defn reset []
     (streams/close app)
