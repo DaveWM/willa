@@ -18,8 +18,11 @@
 
 
 (defn- make-image
-  ([workflow entities] (make-image workflow entities {}))
-  ([workflow entities {:keys [descriptor-fn] :or {descriptor-fn (constantly {})}}]
+  ([topology] (make-image topology {}))
+  ([{:keys [workflow entities joins]} {:keys [node-descriptor-fn cluster-descriptor-fn show-joins]
+                                       :or {node-descriptor-fn (constantly {})
+                                            cluster-descriptor-fn (constantly {})
+                                            show-joins true}}]
    (let [g               (apply l/digraph workflow)
          nodes           (l/nodes g)
          nodes->adjacent (->> nodes
@@ -27,18 +30,28 @@
                               (remove (fn [[n successors]] (nil? successors)))
                               (into {}))]
      (-> (rd/graph->dot nodes nodes->adjacent
-                       :node->descriptor (fn [n]
-                                           (let [{:keys [willa.core/entity-type] :as entity} (get entities n)]
-                                             (merge
-                                               {:label n
-                                                :color "black"
-                                                :fillcolor (entity-type->colour entity-type)
-                                                :style "filled"
-                                                :penwidth 1.3
-                                                :height 0.7
-                                                :width 0.9
-                                                :shape (entity-type->shape entity-type)}
-                                               (descriptor-fn n entity)))))
+                        :node->descriptor (fn [n]
+                                            (let [{:keys [willa.core/entity-type] :as entity} (get entities n)]
+                                              (merge
+                                                {:label n
+                                                 :color "black"
+                                                 :fillcolor (entity-type->colour entity-type)
+                                                 :style "filled"
+                                                 :penwidth 1.3
+                                                 :height 0.7
+                                                 :width 0.9
+                                                 :shape (entity-type->shape entity-type)}
+                                                (node-descriptor-fn n entity))))
+                        :node->cluster (fn [n]
+                                         (when show-joins
+                                           (->> joins
+                                                (filter (fn [[ns _]]
+                                                          (contains? (set ns) n)))
+                                                ffirst)))
+                        :cluster->descriptor (fn [c]
+                                               (let [join-config (get joins c)]
+                                                 (merge {:label (::w/join-type join-config)}
+                                                        (cluster-descriptor-fn c (map entities c) join-config)))))
          (r/dot->image)))))
 
 
@@ -52,11 +65,11 @@
 
 (comment
 
-  (view-workflow [[:topics/input-topic :stream]
-                  [:stream :table]
-                  [:table :topics/output-topic]]
-                 {:topics/input-topic {::w/entity-type :topic}
-                  :stream {::w/entity-type :kstream}
-                  :table {::w/entity-type :ktable}
-                  :topics/output-topic {::w/entity-type :topic}})
+  (view-workflow {:workflow [[:topics/input-topic :stream]
+                             [:stream :table]
+                             [:table :topics/output-topic]]
+                  :entities {:topics/input-topic {::w/entity-type :topic}
+                             :stream {::w/entity-type :kstream}
+                             :table {::w/entity-type :ktable}
+                             :topics/output-topic {::w/entity-type :topic}}})
   )

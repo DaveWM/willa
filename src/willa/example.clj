@@ -111,7 +111,10 @@
   (do (jackdaw.client/seek-to-beginning-eager consumer)
       (map (juxt :key :value) (jackdaw.client/poll consumer 200)))
 
-  (wv/view-workflow workflow entities)
+  (wv/view-workflow {:workflow workflow
+                     :entities entities
+                     :joins joins}
+                    {:show-joins false})
 
   (defn reset []
     (streams/close app)
