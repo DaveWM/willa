@@ -6,50 +6,11 @@
   (:import (org.apache.kafka.streams.kstream JoinWindows)))
 
 
-(defmulti join-entities* (fn [join-config entity other join-fn]
-                           [(::w/join-type join-config) (::w/entity-type entity) (::w/entity-type other)]))
-
-(defmethod join-entities* [:inner :kstream :kstream] [join-config entity other join-fn]
-  (let [before-ms (.beforeMs ^JoinWindows (::w/window join-config))
-        after-ms  (.afterMs ^JoinWindows (::w/window join-config))]
-    (assoc entity ::results
-                  (->> (combo/cartesian-product (::results entity) (::results other))
-                       (filter (fn [[r1 r2]]
-                                 (and (= (:key r1) (:key r2))
-                                      (<= (- (:timestamp r1) before-ms) (:timestamp r2))
-                                      (<= (:timestamp r2) (+ (:timestamp r1) after-ms)))))
-                       (map (fn [[r1 r2]]
-                              {:key (:key r1)
-                               :timestamp (max (:timestamp r1) (:timestamp r2))
-                               :value (join-fn (:value r1) (:value r2))}))))))
-
-(defmethod join-entities* [:left :kstream :kstream] [join-config entity other join-fn]
-  (let [before-ms        (.beforeMs ^JoinWindows (::w/window join-config))
-        after-ms         (.afterMs ^JoinWindows (::w/window join-config))
-        joined-results   (->> (combo/cartesian-product (::results entity) (::results other))
-                              (filter (fn [[r1 r2]]
-                                        (and (= (:key r1) (:key r2))
-                                             (<= (- (:timestamp r1) before-ms) (:timestamp r2))
-                                             (<= (:timestamp r2) (+ (:timestamp r1) after-ms)))))
-                              (map (fn [[l r]]
-                                     {:key (:key l)
-                                      :timestamp (max (:timestamp l) (or (:timestamp r) 0))
-                                      :value (join-fn (:value l) (:value r))})))
-        unjoined-results (->> (::results entity)
-                              (map (fn [result] (update result :value cons [nil]))))]
-    (assoc entity ::results
-                  (->> joined-results
-                       (concat unjoined-results)
-                       (group-by :timestamp)
-                       (mapcat (fn [[t rs]]
-                                 (if (< 1 (count rs))
-                                   (remove (fn [result] (nil? (second (:value result)))) rs)
-                                   rs)))))))
-
-(defmethod join-entities* [:outer :kstream :kstream] [join-config entity other join-fn]
-  (let [before-ms              (.beforeMs ^JoinWindows (::w/window join-config))
-        after-ms               (.afterMs ^JoinWindows (::w/window join-config))
-        joined-results         (->> (combo/cartesian-product (::results entity) (::results other))
+(defn join-results [left-results right-results ^JoinWindows window {:keys [left-join right-join join-fn]
+                                                           :or {join-fn vector}}]
+  (let [before-ms              (.beforeMs window)
+        after-ms               (.afterMs window)
+        joined-results         (->> (combo/cartesian-product left-results right-results)
                                     (filter (fn [[r1 r2]]
                                               (and (= (:key r1) (:key r2))
                                                    (<= (- (:timestamp r1) before-ms) (:timestamp r2))
@@ -58,19 +19,40 @@
                                            {:key (:key l)
                                             :timestamp (max (:timestamp l) (or (:timestamp r) 0))
                                             :value (join-fn (:value l) (:value r))})))
-        left-unjoined-results  (->> (::results entity)
+        left-unjoined-results  (->> left-results
                                     (map (fn [result] (update result :value cons [nil]))))
-        right-unjoined-results (->> (::results other)
+        right-unjoined-results (->> right-results
                                     (map (fn [result] (update result :value #(-> [nil %])))))]
-    (assoc entity ::results
-                  (->> joined-results
-                       (concat left-unjoined-results)
-                       (concat right-unjoined-results)
-                       (group-by :timestamp)
-                       (mapcat (fn [[t rs]]
-                                 (if (< 1 (count rs))
-                                   (remove (fn [result] (some nil? (:value result))) rs)
-                                   rs)))))))
+    (cond->> joined-results
+             left-join (concat left-unjoined-results)
+             right-join (concat right-unjoined-results)
+             true (group-by :timestamp)
+             true (mapcat (fn [[t rs]]
+                            (if (< 1 (count rs))
+                              (remove (fn [result] (some nil? (:value result))) rs)
+                              rs))))))
+
+
+(defmulti join-entities* (fn [join-config entity other join-fn]
+                           [(::w/join-type join-config) (::w/entity-type entity) (::w/entity-type other)]))
+
+(defmethod join-entities* [:inner :kstream :kstream] [join-config entity other join-fn]
+  (assoc entity ::results
+                (join-results (::results entity) (::results other) (::w/window join-config) {:left-join false
+                                                                                             :right-join false
+                                                                                             :join-fn join-fn})))
+
+(defmethod join-entities* [:left :kstream :kstream] [join-config entity other join-fn]
+  (assoc entity ::results
+                (join-results (::results entity) (::results other) (::w/window join-config) {:left-join true
+                                                                                             :right-join false
+                                                                                             :join-fn join-fn})))
+
+(defmethod join-entities* [:outer :kstream :kstream] [join-config entity other join-fn]
+  (assoc entity ::results
+                (join-results (::results entity) (::results other) (::w/window join-config) {:left-join true
+                                                                                             :right-join true
+                                                                                             :join-fn join-fn})))
 
 (defmethod join-entities* [:merge :kstream :kstream] [_ entity other _]
   (update entity ::results concat (::results other)))
