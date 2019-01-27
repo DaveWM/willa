@@ -7,7 +7,7 @@
 
 
 (defmulti join-entities* (fn [join-config entity other join-fn]
-                         [(::w/join-type join-config) (::w/entity-type entity) (::w/entity-type other)]))
+                           [(::w/join-type join-config) (::w/entity-type entity) (::w/entity-type other)]))
 
 (defmethod join-entities* [:inner :kstream :kstream] [join-config entity other join-fn]
   (let [before-ms (.beforeMs ^JoinWindows (::w/window join-config))
@@ -24,35 +24,53 @@
                                :value (join-fn (:value r1) (:value r2))}))))))
 
 (defmethod join-entities* [:left :kstream :kstream] [join-config entity other join-fn]
-  (let [before-ms (.beforeMs ^JoinWindows (::w/window join-config))
-        after-ms  (.afterMs ^JoinWindows (::w/window join-config))]
+  (let [before-ms        (.beforeMs ^JoinWindows (::w/window join-config))
+        after-ms         (.afterMs ^JoinWindows (::w/window join-config))
+        joined-results   (->> (combo/cartesian-product (::results entity) (::results other))
+                              (filter (fn [[r1 r2]]
+                                        (and (= (:key r1) (:key r2))
+                                             (<= (- (:timestamp r1) before-ms) (:timestamp r2))
+                                             (<= (:timestamp r2) (+ (:timestamp r1) after-ms)))))
+                              (map (fn [[l r]]
+                                     {:key (:key l)
+                                      :timestamp (max (:timestamp l) (or (:timestamp r) 0))
+                                      :value (join-fn (:value l) (:value r))})))
+        unjoined-results (->> (::results entity)
+                              (map (fn [result] (update result :value cons [nil]))))]
     (assoc entity ::results
-                  (->> (combo/cartesian-product (::results entity) (::results other))
-                       (filter (fn [[r1 r2] ]
-                                 (and (= (:key r1) (:key r2))
-                                      (<= (- (:timestamp r1) before-ms) (:timestamp r2))
-                                      (<= (:timestamp r2) (+ (:timestamp r1) after-ms)))))
-                       (concat (map (fn [v] [v nil]) (::results entity)))
-                       (map (fn [[r1 r2]]
-                              {:key (:key r1)
-                               :timestamp (max (:timestamp r1) (or (:timestamp r2) 0))
-                               :value (join-fn (:value r1) (:value r2))}))))))
+                  (->> joined-results
+                       (concat unjoined-results)
+                       (group-by :timestamp)
+                       (mapcat (fn [[t rs]]
+                                 (if (< 1 (count rs))
+                                   (remove (fn [result] (nil? (second (:value result)))) rs)
+                                   rs)))))))
 
 (defmethod join-entities* [:outer :kstream :kstream] [join-config entity other join-fn]
-  (let [before-ms (.beforeMs ^JoinWindows (::w/window join-config))
-        after-ms  (.afterMs ^JoinWindows (::w/window join-config))]
+  (let [before-ms              (.beforeMs ^JoinWindows (::w/window join-config))
+        after-ms               (.afterMs ^JoinWindows (::w/window join-config))
+        joined-results         (->> (combo/cartesian-product (::results entity) (::results other))
+                                    (filter (fn [[r1 r2]]
+                                              (and (= (:key r1) (:key r2))
+                                                   (<= (- (:timestamp r1) before-ms) (:timestamp r2))
+                                                   (<= (:timestamp r2) (+ (:timestamp r1) after-ms)))))
+                                    (map (fn [[l r]]
+                                           {:key (:key l)
+                                            :timestamp (max (:timestamp l) (or (:timestamp r) 0))
+                                            :value (join-fn (:value l) (:value r))})))
+        left-unjoined-results  (->> (::results entity)
+                                    (map (fn [result] (update result :value cons [nil]))))
+        right-unjoined-results (->> (::results other)
+                                    (map (fn [result] (update result :value #(-> [nil %])))))]
     (assoc entity ::results
-                  (->> (combo/cartesian-product (::results entity) (::results other))
-                       (filter (fn [[r1 r2]]
-                                 (and (= (:key r1) (:key r2))
-                                      (<= (- (:timestamp r1) before-ms) (:timestamp r2))
-                                      (<= (:timestamp r2) (+ (:timestamp r1) after-ms)))))
-                       (concat (map (fn [v] [v nil]) (::results entity)))
-                       (concat (map (fn [v] [nil v]) (::results other)))
-                       (map (fn [[r1 r2]]
-                              {:key (:key #spy/p (or r1 r2))
-                               :timestamp (max (or (:timestamp r1) 0) (or (:timestamp r2) 0))
-                               :value (join-fn (:value r1) (:value r2))}))))))
+                  (->> joined-results
+                       (concat left-unjoined-results)
+                       (concat right-unjoined-results)
+                       (group-by :timestamp)
+                       (mapcat (fn [[t rs]]
+                                 (if (< 1 (count rs))
+                                   (remove (fn [result] (some nil? (:value result))) rs)
+                                   rs)))))))
 
 (defmethod join-entities* [:merge :kstream :kstream] [_ entity other _]
   (update entity ::results concat (::results other)))
