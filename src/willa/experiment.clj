@@ -41,12 +41,14 @@
                                   (map (fn [result]
                                          [result
                                           (->> sorted-right-results
-                                               (filter #(<= (:timestamp %) (:timestamp result)))
+                                               (filter #(and (<= (:timestamp %) (:timestamp result))
+                                                             (= (:key %) (:key result))))
                                                last)])))
         right-joined         (->> right-results
                                   (map (fn [result]
                                          [(->> sorted-left-results
-                                               (filter #(<= (:timestamp %) (:timestamp result)))
+                                               (filter #(and (<= (:timestamp %) (:timestamp result))
+                                                             (= (:key %) (:key result))))
                                                last)
                                           result])))]
     (->> (concat left-joined right-joined)
