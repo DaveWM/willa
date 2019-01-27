@@ -6,8 +6,8 @@
   (:import (org.apache.kafka.streams.kstream JoinWindows)))
 
 
-(defn join-results [left-results right-results ^JoinWindows window {:keys [left-join right-join join-fn]
-                                                           :or {join-fn vector}}]
+(defn join-kstream-results [left-results right-results ^JoinWindows window {:keys [left-join right-join join-fn]
+                                                                            :or {join-fn vector}}]
   (let [before-ms              (.beforeMs window)
         after-ms               (.afterMs window)
         joined-results         (->> (combo/cartesian-product left-results right-results)
@@ -33,29 +33,70 @@
                               rs))))))
 
 
+(defn join-ktable-results [left-results right-results {:keys [left-join right-join join-fn]
+                                                       :or {join-fn vector}}]
+  (let [sorted-left-results  (sort-by :timestamp left-results)
+        sorted-right-results (sort-by :timestamp right-results)
+        left-joined          (->> left-results
+                                  (map (fn [result]
+                                         [result
+                                          (->> sorted-right-results
+                                               (filter #(<= (:timestamp %) (:timestamp result)))
+                                               last)])))
+        right-joined         (->> right-results
+                                  (map (fn [result]
+                                         [(->> sorted-left-results
+                                               (filter #(<= (:timestamp %) (:timestamp result)))
+                                               last)
+                                          result])))]
+    (->> (concat left-joined right-joined)
+         (filter (fn [[l r]]
+                   (and (or (not left-join) (some? l))
+                        (or (not right-join) (some? r)))))
+         (map (fn [[l r]]
+                {:key (:key (or l r))
+                 :value (join-fn (:value l) (:value r))
+                 :timestamp ((fnil max 0 0) (:timestamp l) (:timestamp r))})))))
+
+
 (defmulti join-entities* (fn [join-config entity other join-fn]
                            [(::w/join-type join-config) (::w/entity-type entity) (::w/entity-type other)]))
 
 (defmethod join-entities* [:inner :kstream :kstream] [join-config entity other join-fn]
   (assoc entity ::results
-                (join-results (::results entity) (::results other) (::w/window join-config) {:left-join false
-                                                                                             :right-join false
-                                                                                             :join-fn join-fn})))
+                (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join false
+                                                                                                     :right-join false
+                                                                                                     :join-fn join-fn})))
 
 (defmethod join-entities* [:left :kstream :kstream] [join-config entity other join-fn]
   (assoc entity ::results
-                (join-results (::results entity) (::results other) (::w/window join-config) {:left-join true
-                                                                                             :right-join false
-                                                                                             :join-fn join-fn})))
+                (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join true
+                                                                                                     :right-join false
+                                                                                                     :join-fn join-fn})))
 
 (defmethod join-entities* [:outer :kstream :kstream] [join-config entity other join-fn]
   (assoc entity ::results
-                (join-results (::results entity) (::results other) (::w/window join-config) {:left-join true
-                                                                                             :right-join true
-                                                                                             :join-fn join-fn})))
+                (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join true
+                                                                                                     :right-join true
+                                                                                                     :join-fn join-fn})))
 
 (defmethod join-entities* [:merge :kstream :kstream] [_ entity other _]
   (update entity ::results concat (::results other)))
+
+(defmethod join-entities* [:inner :ktable :ktable] [_ entity other join-fn]
+  (assoc entity ::results (join-ktable-results (::results entity) (::results other) {:left-join true
+                                                                                     :right-join true
+                                                                                     :join-fn join-fn})))
+
+(defmethod join-entities* [:left :ktable :ktable] [_ entity other join-fn]
+  (assoc entity ::results (join-ktable-results (::results entity) (::results other) {:left-join true
+                                                                                     :right-join false
+                                                                                     :join-fn join-fn})))
+
+(defmethod join-entities* [:outer :ktable :ktable] [_ entity other join-fn]
+  (assoc entity ::results (join-ktable-results (::results entity) (::results other) {:left-join false
+                                                                                     :right-join false
+                                                                                     :join-fn join-fn})))
 
 
 (defn ->joinable [entity]

@@ -42,10 +42,11 @@
 
 
 (def workflow
-  (concat
-    [[:topics/input-topic :stream]
-     [:topics/secondary-input-topic :stream]]
-    (ww/with-dedupe "stream-dedupe" :stream :topics/output-topic)))
+  [[:topics/input-topic :left-table]
+   [:topics/secondary-input-topic :right-table]
+   [:left-table :stream]
+   [:right-table :stream]
+   [:stream :topics/output-topic]])
 
 (def entities
   (merge {:topics/input-topic (assoc input-topic ::w/entity-type :topic)
@@ -54,7 +55,8 @@
           :topics/output-topic (assoc output-topic ::w/entity-type :topic)
           :topics/secondary-output-topic (assoc secondary-output-topic ::w/entity-type :topic)
           :stream {::w/entity-type :kstream
-                   ::w/xform (map (wu/transform-value inc))}}
+                   ;::w/xform (map (wu/transform-value inc))
+                   }}
          (ww/dedupe-entities "stream-dedupe")
          {:suppressed-table {::w/entity-type :ktable
                              ::w/group-by-fn (fn [[k v]] k)
@@ -62,11 +64,12 @@
                              ::w/aggregate-adder-fn (fn [acc [k v]]
                                                       (+ acc v))
                              ::w/window (.grace (TimeWindows/of 10000) (Duration/ofMillis 10000))
-                             ::w/suppression (Suppressed/untilWindowCloses (Suppressed$BufferConfig/unbounded))}}))
+                             ::w/suppression (Suppressed/untilWindowCloses (Suppressed$BufferConfig/unbounded))}
+          :left-table {::w/entity-type :ktable}
+          :right-table {::w/entity-type :ktable}}))
 
 (def joins
-  {[:topics/input-topic :topics/secondary-input-topic] {::w/join-type :merge
-                                                        ::w/window (JoinWindows/of 10000)}})
+  {[:left-table :right-table] {::w/join-type :inner}})
 
 
 (defn start! []
@@ -100,8 +103,8 @@
 
   (def producer (jackdaw.client/producer app-config
                                          willa.streams/default-serdes))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 3))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord secondary-input-topic "key" 2))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 8))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord secondary-input-topic "key" 7))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord tertiary-input-topic "key" 3))
 
 
@@ -114,7 +117,7 @@
   (wv/view-workflow {:workflow workflow
                      :entities entities
                      :joins joins}
-                    {:show-joins false})
+                    {:show-joins true})
 
   (defn reset []
     (streams/close app)
