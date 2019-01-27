@@ -31,9 +31,11 @@
                               (into {}))]
      (-> (rd/graph->dot nodes nodes->adjacent
                         :node->descriptor (fn [n]
-                                            (let [{:keys [willa.core/entity-type] :as entity} (get entities n)]
+                                            (let [{:keys [willa.core/entity-type willa.experiment/results] :as entity} (get entities n)]
                                               (merge
-                                                {:label n
+                                                {:label (if results
+                                                          (str n "\n\n" (prn-str results))
+                                                          n)
                                                  :color "black"
                                                  :fillcolor (entity-type->colour entity-type)
                                                  :style "filled"
