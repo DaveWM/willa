@@ -6,5 +6,6 @@
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [fundingcircle/jackdaw "0.4.2"]
                  [aysylu/loom "1.0.2"]
-                 [rhizome "0.2.9"]]
+                 [rhizome "0.2.9"]
+                 [org.clojure/math.combinatorics "0.1.4"]]
   :repl-options {:init-ns willa.core})
