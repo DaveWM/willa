@@ -26,7 +26,7 @@
     (cond->> joined-results
              left-join (concat left-unjoined-results)
              right-join (concat right-unjoined-results)
-             true (group-by :timestamp)
+             true (group-by (juxt :timestamp :key))
              true (mapcat (fn [[t rs]]
                             (if (< 1 (count rs))
                               (remove (fn [result] (some nil? (:value result))) rs)
