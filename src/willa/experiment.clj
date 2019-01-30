@@ -3,7 +3,7 @@
             [loom.alg :as lalg]
             [willa.core :as w]
             [clojure.math.combinatorics :as combo])
-  (:import (org.apache.kafka.streams.kstream JoinWindows)))
+  (:import (org.apache.kafka.streams.kstream JoinWindows TimeWindows SessionWindows)))
 
 
 (defn join-kstream-results [left-results right-results ^JoinWindows window {:keys [left-join right-join join-fn]
@@ -66,21 +66,21 @@
 
 (defmethod join-entities* [:inner :kstream :kstream] [join-config entity other join-fn]
   (assoc entity ::results
-                (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join false
-                                                                                                     :right-join false
-                                                                                                     :join-fn join-fn})))
+         (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join false
+                                                                                              :right-join false
+                                                                                              :join-fn join-fn})))
 
 (defmethod join-entities* [:left :kstream :kstream] [join-config entity other join-fn]
   (assoc entity ::results
-                (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join true
-                                                                                                     :right-join false
-                                                                                                     :join-fn join-fn})))
+         (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join true
+                                                                                              :right-join false
+                                                                                              :join-fn join-fn})))
 
 (defmethod join-entities* [:outer :kstream :kstream] [join-config entity other join-fn]
   (assoc entity ::results
-                (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join true
-                                                                                                     :right-join true
-                                                                                                     :join-fn join-fn})))
+         (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join true
+                                                                                              :right-join true
+                                                                                              :join-fn join-fn})))
 
 (defmethod join-entities* [:merge :kstream :kstream] [_ entity other _]
   (update entity ::results concat (::results other)))
@@ -119,6 +119,47 @@
           others)))
 
 
+(defmulti determine-windows (fn [window records]
+                              (type window)))
+
+(defmethod determine-windows TimeWindows [^TimeWindows window records]
+  (let [[earliest-timestamp latest-timestamp] (->> records
+                                                   (sort-by :timestamp)
+                                                   (map :timestamp)
+                                                   ((juxt first last)))
+        window-start (- earliest-timestamp (mod earliest-timestamp (.advanceMs window)))
+        window-end   (+ latest-timestamp (- (.advanceMs window) (mod latest-timestamp (.-advanceMs window))))]
+    (->> (range window-start window-end (.advanceMs window))
+         (map (fn [from]
+                {:from from
+                 :to (+ from (.sizeMs window))})))))
+
+
+(defmethod determine-windows SessionWindows [^SessionWindows window records]
+  (loop [windows []
+         rs      records]
+    (if (empty? rs)
+      windows
+      (let [[rs-in-window other-rs] (->> rs
+                                         (partition-all 2 1)
+                                         (split-with (fn [[x y]]
+                                                       (or (not y)
+                                                           (<= (- (:timestamp y)
+                                                                  (:timestamp x))
+                                                               (.inactivityGap window))))))
+            [from to] (->> rs-in-window
+                           (flatten)
+                           (map :timestamp)
+                           ((juxt first last)))]
+        (recur (conj windows {:from from :to (+ to (.inactivityGap window))})
+               (map first (rest other-rs)))))))
+
+
+(defn records-in-window [window records]
+  (->> records
+       (filter #(<= (:from window) (:timestamp %) (:to window)))))
+
+
 (defmulti process-entity (fn [entity parents entities joins]
                            (::w/entity-type entity)))
 
@@ -141,6 +182,28 @@
                                          (map (fn [[k v]] (merge r {:key k :value v}))))
                                    [r]))
                            (mapcat identity))]
+    (assoc entity ::results results)))
+
+
+(defmethod process-entity :ktable [entity parents entities joins]
+  (let [[join-order join-config] (w/get-join joins parents)
+        joined-entity (if join-order
+                        (apply join-entities join-config (map (comp ->joinable entities) join-order))
+                        (get entities (first parents)))
+        results       (cond->> (::results joined-entity)
+                               true (sort-by :timestamp)
+                               (::w/group-by-fn entity) (group-by (fn [r]
+                                                                    ((::w/group-by-fn entity) ((juxt :key :value) r))))
+                               (::w/window entity) (mapcat (fn [[g rs]]
+                                                             (for [w (determine-windows (::w/window entity) rs)]
+                                                               [[g w] (records-in-window w rs)])))
+                               (::w/aggregate-adder-fn entity) (mapcat (fn [[g rs]]
+                                                                         (->> (reductions (fn [acc r]
+                                                                                            (assoc r :value
+                                                                                                   ((::w/aggregate-adder-fn entity) (:value acc) ((juxt :key :value) r))))
+                                                                                          {:value (::w/aggregate-initial-value entity)}
+                                                                                          rs)
+                                                                              (drop 1)))))]
     (assoc entity ::results results)))
 
 
@@ -183,8 +246,7 @@
                                     :timestamp 500}]
                      :secondary-input-topic [{:key "key"
                                               :value 2
-                                              :timestamp 1000}]
-                     }))
+                                              :timestamp 1000}]}))
 
   (willa.viz/view-workflow {:workflow workflow
                             :entities processed-entities})

@@ -42,11 +42,8 @@
 
 
 (def workflow
-  [[:topics/input-topic :left-table]
-   [:topics/secondary-input-topic :right-table]
-   [:left-table :stream]
-   [:right-table :stream]
-   [:stream :topics/output-topic]])
+  [[:topics/input-topic :table]
+   [:table :topics/output-topic]])
 
 (def entities
   (merge {:topics/input-topic (assoc input-topic ::w/entity-type :topic)
@@ -66,7 +63,14 @@
                              ::w/window (.grace (TimeWindows/of 10000) (Duration/ofMillis 10000))
                              ::w/suppression (Suppressed/untilWindowCloses (Suppressed$BufferConfig/unbounded))}
           :left-table {::w/entity-type :ktable}
-          :right-table {::w/entity-type :ktable}}))
+          :right-table {::w/entity-type :ktable}
+          :table {::w/entity-type :ktable
+                  ::w/group-by-fn (fn [[k v]] (if (even? v) "even" "odd"))
+                  ::w/window (.advanceBy (TimeWindows/of 5000) 2500)
+                  ::w/aggregate-initial-value 0
+                  ::w/aggregate-adder-fn (fn [acc [k v]]
+                                           #spy/p [acc k v]
+                                           (+ acc v))}}))
 
 (def joins
   {[:left-table :right-table] {::w/join-type :inner}})
@@ -103,16 +107,16 @@
 
   (def producer (jackdaw.client/producer app-config
                                          willa.streams/default-serdes))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 8))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord secondary-input-topic "key" 7))
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord tertiary-input-topic "key" 3))
-
-
   (def consumer (jackdaw.client/consumer (assoc app-config "group.id" "consumer")
                                          willa.streams/default-serdes))
   (jackdaw.client/subscribe consumer [output-topic])
+
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 1))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 2))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord tertiary-input-topic "key" 3))
+
   (do (jackdaw.client/seek-to-beginning-eager consumer)
-      (map (juxt :key :value) (jackdaw.client/poll consumer 200)))
+      (map (juxt :key :value :timestamp) (jackdaw.client/poll consumer 200)))
 
   (wv/view-workflow {:workflow workflow
                      :entities entities
