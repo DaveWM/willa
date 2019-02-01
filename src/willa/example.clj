@@ -42,8 +42,8 @@
 
 
 (def workflow
-  [[:topics/input-topic :table]
-   [:table :topics/output-topic]])
+  [[:topics/input-topic :stream]
+   [:stream :topics/output-topic]])
 
 (def entities
   (merge {:topics/input-topic (assoc input-topic ::w/entity-type :topic)
@@ -52,7 +52,8 @@
           :topics/output-topic (assoc output-topic ::w/entity-type :topic)
           :topics/secondary-output-topic (assoc secondary-output-topic ::w/entity-type :topic)
           :stream {::w/entity-type :kstream
-                   ;::w/xform (map (wu/transform-value inc))
+                   ::w/xform (comp (map (wu/transform-value inc))
+                                   (filter (wu/value-pred even?)))
                    }}
          (ww/dedupe-entities "stream-dedupe")
          {:suppressed-table {::w/entity-type :ktable
@@ -69,7 +70,6 @@
                   ::w/window (.advanceBy (TimeWindows/of 5000) 2500)
                   ::w/aggregate-initial-value 0
                   ::w/aggregate-adder-fn (fn [acc [k v]]
-                                           #spy/p [acc k v]
                                            (+ acc v))}}))
 
 (def joins
@@ -109,14 +109,22 @@
                                          willa.streams/default-serdes))
   (def consumer (jackdaw.client/consumer (assoc app-config "group.id" "consumer")
                                          willa.streams/default-serdes))
+  (def input-consumer (jackdaw.client/consumer (assoc app-config "group.id" "input-consumer")
+                                         willa.streams/default-serdes))
   (jackdaw.client/subscribe consumer [output-topic])
+  (jackdaw.client/subscribe input-consumer [input-topic])
 
-  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 1))
+  @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 3))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord input-topic "key" 2))
   @(jackdaw.client/send! producer (jackdaw.data/->ProducerRecord tertiary-input-topic "key" 3))
 
   (do (jackdaw.client/seek-to-beginning-eager consumer)
-      (map (juxt :key :value :timestamp) (jackdaw.client/poll consumer 200)))
+      (->> (jackdaw.client/poll consumer 200)
+           (map #(select-keys % [:key :value :timestamp]))))
+
+  (do (jackdaw.client/seek-to-beginning-eager input-consumer)
+      (->> (jackdaw.client/poll input-consumer 200)
+           (map #(select-keys % [:key :value :timestamp]))))
 
   (wv/view-workflow {:workflow workflow
                      :entities entities
@@ -132,4 +140,15 @@
     (a/<!! (a/timeout 100))
     (alter-var-root #'app (fn [_] (start!))))
 
+  (do (jackdaw.client/seek-to-beginning-eager consumer)
+      (->> (jackdaw.client/poll consumer 200)
+           (map #(select-keys % [:key :value :timestamp]))))
+  (->> (we/run-experiment {:workflow workflow
+                           :entities entities
+                           :joins joins}
+                          {:topics/input-topic (do (jackdaw.client/seek-to-beginning-eager input-consumer)
+                                                   (->> (jackdaw.client/poll input-consumer 200)
+                                                        (map #(select-keys % [:key :value :timestamp]))))})
+       :topics/output-topic
+       ::we/results)
   )
