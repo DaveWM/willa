@@ -31,15 +31,15 @@
          ws/default-serdes))
 
 
-(defn congruous? [config inputs]
-  (let [experiment-entities (we/run-experiment config inputs)
+(defn congruous? [world inputs]
+  (let [experiment-entities (:entities (we/run-experiment world inputs))
         builder             (streams/streams-builder)
-        built-entities      (w/build-workflow! builder config)]
+        built-entities      (w/build-workflow! builder world)]
     (with-open [driver (test-driver builder {"application.id" "test"
                                              "bootstrap.servers" "localhost:9092"
                                              "cache.max.bytes.buffering" "0"})
                 tm     (jt/test-machine (jt/mock-transport {:driver driver}
-                                                           (->> (:entities config)
+                                                           (->> (:entities world)
                                                                 (filter (fn [[k v]]
                                                                           (= :topic (::w/entity-type v))))
                                                                 (map (fn [[_ t]] [(:topic-name t) t]))
@@ -53,15 +53,15 @@
                                                 (sort-by (fn [[e r]] (:timestamp r)))
                                                 (map (fn [[e r]]
                                                        [:write!
-                                                        (:topic-name (get-in config [:entities e]))
+                                                        (:topic-name (get-in world [:entities e]))
                                                         (:value r) {:key (:key r)
                                                                     :timestamp (:timestamp r)}])))
                                            [[:watch (fn [journal]
                                                       (= (count (get-in journal [:topics "output-topic"]))
-                                                         (count (get-in experiment-entities [:output-topic ::we/results]))))]])))
+                                                         (count (get-in experiment-entities [:output-topic ::we/output]))))]])))
             test-topology-results (->> (get-in results [:journal :topics])
                                        (mapcat (fn [[topic-name rs]]
-                                                 (let [topic-key (->> (:entities config)
+                                                 (let [topic-key (->> (:entities world)
                                                                       (filter (fn [[k v]] (= topic-name (:topic-name v))))
                                                                       (map key)
                                                                       first)]
@@ -78,7 +78,7 @@
                                     (filter (fn [[k v]]
                                               (topic-names (:topic-name v))))
                                     (mapcat (fn [[topic-key entity]]
-                                              (->> (::we/results entity)
+                                              (->> (::we/output entity)
                                                    (sort-by :timestamp)
                                                    (map #(select-keys % [:key :value]))
                                                    (map #(-> [topic-key %]))))))]
@@ -138,6 +138,21 @@
                                                                   ::w/window (JoinWindows/of 100)}}}
                   {:input-topic [{:key "k" :value 1 :timestamp 100}]
                    :secondary-input-topic [{:key "k" :value 2 :timestamp 150}]}))
+
+
+  (is (congruous? {:workflow [[:input-topic :stream]
+                              [:secondary-input-topic :stream]
+                              [:stream :output-topic]]
+                   :entities {:input-topic (->topic "input-topic")
+                              :secondary-input-topic (->topic "secondary-input-topic")
+                              :stream {::w/entity-type :kstream
+                                       ::w/xform (map (fn [[k v]]
+                                                        [k (apply + (remove nil? v))]))}
+                              :output-topic (->topic "output-topic")}
+                   :joins {[:input-topic :secondary-input-topic] {::w/join-type :left
+                                                                  ::w/window (JoinWindows/of 100)}}}
+                  {:input-topic [{:key "k" :value 1 :timestamp 150}]
+                   :secondary-input-topic [{:key "k" :value 2 :timestamp 100}]}))
 
   (is (congruous? {:workflow [[:input-topic :stream]
                               [:secondary-input-topic :stream]

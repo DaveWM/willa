@@ -65,38 +65,38 @@
                            [(::w/join-type join-config) (::w/entity-type entity) (::w/entity-type other)]))
 
 (defmethod join-entities* [:inner :kstream :kstream] [join-config entity other join-fn]
-  (assoc entity ::results
-         (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join false
+  (assoc entity ::output
+         (join-kstream-results (::output entity) (::output other) (::w/window join-config) {:left-join false
                                                                                               :right-join false
                                                                                               :join-fn join-fn})))
 
 (defmethod join-entities* [:left :kstream :kstream] [join-config entity other join-fn]
-  (assoc entity ::results
-         (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join true
+  (assoc entity ::output
+         (join-kstream-results (::output entity) (::output other) (::w/window join-config) {:left-join true
                                                                                               :right-join false
                                                                                               :join-fn join-fn})))
 
 (defmethod join-entities* [:outer :kstream :kstream] [join-config entity other join-fn]
-  (assoc entity ::results
-         (join-kstream-results (::results entity) (::results other) (::w/window join-config) {:left-join true
+  (assoc entity ::output
+         (join-kstream-results (::output entity) (::output other) (::w/window join-config) {:left-join true
                                                                                               :right-join true
                                                                                               :join-fn join-fn})))
 
 (defmethod join-entities* [:merge :kstream :kstream] [_ entity other _]
-  (update entity ::results concat (::results other)))
+  (update entity ::output concat (::output other)))
 
 (defmethod join-entities* [:inner :ktable :ktable] [_ entity other join-fn]
-  (assoc entity ::results (join-ktable-results (::results entity) (::results other) {:left-join true
+  (assoc entity ::output (join-ktable-results (::output entity) (::output other) {:left-join true
                                                                                      :right-join true
                                                                                      :join-fn join-fn})))
 
 (defmethod join-entities* [:left :ktable :ktable] [_ entity other join-fn]
-  (assoc entity ::results (join-ktable-results (::results entity) (::results other) {:left-join true
+  (assoc entity ::output (join-ktable-results (::output entity) (::output other) {:left-join true
                                                                                      :right-join false
                                                                                      :join-fn join-fn})))
 
 (defmethod join-entities* [:outer :ktable :ktable] [_ entity other join-fn]
-  (assoc entity ::results (join-ktable-results (::results entity) (::results other) {:left-join false
+  (assoc entity ::output (join-ktable-results (::output entity) (::output other) {:left-join false
                                                                                      :right-join false
                                                                                      :join-fn join-fn})))
 
@@ -165,8 +165,8 @@
 
 (defmethod process-entity :topic [entity parents entities _]
   (if parents
-    (assoc entity ::results (->> (map entities parents)
-                                 (mapcat ::results)))
+    (assoc entity ::output (->> (map entities parents)
+                                (mapcat ::output)))
     entity))
 
 (defmethod process-entity :kstream [entity parents entities joins]
@@ -175,14 +175,14 @@
                         (apply join-entities join-config (map (comp ->joinable entities) join-order))
                         (get entities (first parents)))
         xform         (get entity ::w/xform (map identity))
-        results       (->> (for [r (::results joined-entity)]
+        results       (->> (for [r (::output joined-entity)]
                              (into []
                                    (comp (map (juxt :key :value))
                                          xform
                                          (map (fn [[k v]] (merge r {:key k :value v}))))
                                    [r]))
                            (mapcat identity))]
-    (assoc entity ::results results)))
+    (assoc entity ::output results)))
 
 
 (defmethod process-entity :ktable [entity parents entities joins]
@@ -190,7 +190,7 @@
         joined-entity (if join-order
                         (apply join-entities join-config (map (comp ->joinable entities) join-order))
                         (get entities (first parents)))
-        results       (cond->> (::results joined-entity)
+        results       (cond->> (::output joined-entity)
                                true (sort-by :timestamp)
                                (::w/group-by-fn entity) (group-by (fn [r]
                                                                     ((::w/group-by-fn entity) ((juxt :key :value) r))))
@@ -204,20 +204,21 @@
                                                                                           {:value (::w/aggregate-initial-value entity)}
                                                                                           rs)
                                                                               (drop 1)))))]
-    (assoc entity ::results results)))
+    (assoc entity ::output results)))
 
 
-(defn run-experiment [{:keys [workflow entities joins]} entity->records]
+(defn run-experiment [{:keys [workflow entities joins] :as world} entity->records]
   (let [g                (apply l/digraph workflow)
         initial-entities (->> entities
-                              (map (fn [[k v]] [k (assoc v ::results (get entity->records k))]))
+                              (map (fn [[k v]] [k (assoc v ::output (get entity->records k))]))
                               (into {}))]
-    (->> g
-         (lalg/topsort)
-         (map (juxt identity (partial l/predecessors g)))
-         (reduce (fn [processed-entities [node parents]]
-                   (update processed-entities node process-entity parents processed-entities joins))
-                 initial-entities))))
+    (assoc world :entities
+           (->> g
+                (lalg/topsort)
+                (map (juxt identity (partial l/predecessors g)))
+                (reduce (fn [processed-entities [node parents]]
+                          (update processed-entities node process-entity parents processed-entities joins))
+                        initial-entities)))))
 
 
 (comment
@@ -230,7 +231,7 @@
                  [:tertiary-input-topic :stream]
                  [:stream :output-topic]])
 
-  (def processed-entities
+  (def experiment-world
     (run-experiment {:workflow workflow
                      :entities {:input-topic {::w/entity-type :topic}
                                 :secondary-input-topic {::w/entity-type :topic}
@@ -248,6 +249,5 @@
                                               :value 2
                                               :timestamp 1000}]}))
 
-  (willa.viz/view-workflow {:workflow workflow
-                            :entities processed-entities})
+  (willa.viz/view-workflow experiment-world)
   )

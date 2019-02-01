@@ -19,7 +19,8 @@
 (defn ->topic [name]
   (merge {:topic-name name
           :replication-factor 1
-          :partition-count 1}
+          :partition-count 1
+          ::w/entity-type :topic}
          ws/default-serdes))
 
 (def input-topic
@@ -46,11 +47,11 @@
    [:stream :topics/output-topic]])
 
 (def entities
-  (merge {:topics/input-topic (assoc input-topic ::w/entity-type :topic)
-          :topics/secondary-input-topic (assoc secondary-input-topic ::w/entity-type :topic)
-          :topics/tertiary-input-topic (assoc tertiary-input-topic ::w/entity-type :topic)
-          :topics/output-topic (assoc output-topic ::w/entity-type :topic)
-          :topics/secondary-output-topic (assoc secondary-output-topic ::w/entity-type :topic)
+  (merge {:topics/input-topic input-topic
+          :topics/secondary-input-topic secondary-input-topic
+          :topics/tertiary-input-topic tertiary-input-topic
+          :topics/output-topic output-topic
+          :topics/secondary-output-topic secondary-output-topic
           :stream {::w/entity-type :kstream
                    ::w/xform (comp (map (wu/transform-value inc))
                                    (filter (wu/value-pred even?)))
@@ -94,7 +95,8 @@
 
   (require 'jackdaw.client
            'jackdaw.admin
-           '[clojure.core.async :as a])
+           '[clojure.core.async :as a]
+           '[willa.experiment :as we])
 
   (def admin-client (jackdaw.admin/->AdminClient app-config))
   (jackdaw.admin/create-topics! admin-client topics)
@@ -130,6 +132,11 @@
                      :entities entities
                      :joins joins}
                     {:show-joins true})
+  (wv/view-workflow (we/run-experiment {:workflow workflow
+                                        :entities entities
+                                        :joins joins}
+                                       {:topics/input-topic [{:key "k" :value 1 :timestamp 0}]}))
+
 
   (defn reset []
     (streams/close app)
@@ -150,5 +157,5 @@
                                                    (->> (jackdaw.client/poll input-consumer 200)
                                                         (map #(select-keys % [:key :value :timestamp]))))})
        :topics/output-topic
-       ::we/results)
+       ::we/output)
   )
