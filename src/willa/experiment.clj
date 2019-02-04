@@ -132,7 +132,7 @@
     (->> (range window-start window-end (.advanceMs window))
          (map (fn [from]
                 {:from from
-                 :to (+ from (.sizeMs window))})))))
+                 :to (dec (+ from (.sizeMs window)))})))))
 
 
 (defmethod determine-windows SessionWindows [^SessionWindows window records]
@@ -151,7 +151,7 @@
                            (flatten)
                            (map :timestamp)
                            ((juxt first last)))]
-        (recur (conj windows {:from from :to (+ to (.inactivityGap window))})
+        (recur (conj windows {:from from :to (dec (+ to (.inactivityGap window)))})
                (map first (rest other-rs)))))))
 
 
