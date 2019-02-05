@@ -51,22 +51,17 @@
   (merge {:topics/input-topic input-topic
           :topics/output-topic output-topic
           :stream {::w/entity-type :kstream
-                   ;::w/xform
-                    #_(comp (map (wu/transform-value inc))
-                         (filter (wu/value-pred even?)))}}))
+                   ::w/xform (comp (map (wu/transform-value inc))
+                                   (filter (wu/value-pred even?)))}}))
 
 (def joins {})
 
 
 (defn start! []
   (let [builder (doto (streams/streams-builder)
-                  (w/build-workflow-unsafe! {:workflow workflow
-                                              :entities entities
-                                              :joins joins}
-                                            {:stream (fn [entity builder parents entities joins]
-                                                       (let [input-topic (entities (first parents))]
-                                                         (-> (streams/kstream builder input-topic)
-                                                             (streams/map-values inc))))}))]
+                  (w/build-workflow! {:workflow workflow
+                                      :entities entities
+                                      :joins joins}))]
     (doto (streams/kafka-streams builder
                                  app-config)
       (.setUncaughtExceptionHandler (reify Thread$UncaughtExceptionHandler

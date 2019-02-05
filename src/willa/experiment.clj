@@ -160,51 +160,48 @@
        (filter #(<= (:from window) (:timestamp %) (:to window)))))
 
 
-(defmulti process-entity (fn [entity parents entities joins]
+(defmulti get-output (fn [entity parents entities joins]
                            (::w/entity-type entity)))
 
-(defmethod process-entity :topic [entity parents entities _]
-  (if parents
-    (assoc entity ::output (->> (map entities parents)
-                                (mapcat ::output)))
-    entity))
+(defmethod get-output :topic [entity parents entities _]
+  (when parents
+    (->> (map entities parents)
+         (mapcat ::output))))
 
-(defmethod process-entity :kstream [entity parents entities joins]
+(defmethod get-output :kstream [entity parents entities joins]
   (let [[join-order join-config] (w/get-join joins parents)
         joined-entity (if join-order
                         (apply join-entities join-config (map (comp ->joinable entities) join-order))
                         (get entities (first parents)))
-        xform         (get entity ::w/xform (map identity))
-        results       (->> (for [r (::output joined-entity)]
-                             (into []
-                                   (comp (map (juxt :key :value))
-                                         xform
-                                         (map (fn [[k v]] (merge r {:key k :value v}))))
-                                   [r]))
-                           (mapcat identity))]
-    (assoc entity ::output results)))
+        xform         (get entity ::w/xform (map identity))]
+    (->> (for [r (::output joined-entity)]
+           (into []
+                 (comp (map (juxt :key :value))
+                       xform
+                       (map (fn [[k v]] (merge r {:key k :value v}))))
+                 [r]))
+         (mapcat identity))))
 
 
-(defmethod process-entity :ktable [entity parents entities joins]
+(defmethod get-output :ktable [entity parents entities joins]
   (let [[join-order join-config] (w/get-join joins parents)
         joined-entity (if join-order
                         (apply join-entities join-config (map (comp ->joinable entities) join-order))
-                        (get entities (first parents)))
-        results       (cond->> (::output joined-entity)
-                               true (sort-by :timestamp)
-                               (::w/group-by-fn entity) (group-by (fn [r]
-                                                                    ((::w/group-by-fn entity) ((juxt :key :value) r))))
-                               (::w/window entity) (mapcat (fn [[g rs]]
-                                                             (for [w (determine-windows (::w/window entity) rs)]
-                                                               [[g w] (records-in-window w rs)])))
-                               (::w/aggregate-adder-fn entity) (mapcat (fn [[g rs]]
-                                                                         (->> (reductions (fn [acc r]
-                                                                                            (assoc r :value
-                                                                                                   ((::w/aggregate-adder-fn entity) (:value acc) ((juxt :key :value) r))))
-                                                                                          {:value (::w/aggregate-initial-value entity)}
-                                                                                          rs)
-                                                                              (drop 1)))))]
-    (assoc entity ::output results)))
+                        (get entities (first parents)))]
+    (cond->> (::output joined-entity)
+             true (sort-by :timestamp)
+             (::w/group-by-fn entity) (group-by (fn [r]
+                                                  ((::w/group-by-fn entity) ((juxt :key :value) r))))
+             (::w/window entity) (mapcat (fn [[g rs]]
+                                           (for [w (determine-windows (::w/window entity) rs)]
+                                             [[g w] (records-in-window w rs)])))
+             (::w/aggregate-adder-fn entity) (mapcat (fn [[g rs]]
+                                                       (->> (reductions (fn [acc r]
+                                                                          (assoc r :value
+                                                                                 ((::w/aggregate-adder-fn entity) (:value acc) ((juxt :key :value) r))))
+                                                                        {:value (::w/aggregate-initial-value entity)}
+                                                                        rs)
+                                                            (drop 1)))))))
 
 
 (defn run-experiment [{:keys [workflow entities joins] :as world} entity->records]
@@ -217,7 +214,10 @@
                 (lalg/topsort)
                 (map (juxt identity (partial l/predecessors g)))
                 (reduce (fn [processed-entities [node parents]]
-                          (update processed-entities node process-entity parents processed-entities joins))
+                          (update processed-entities node
+                                  (fn [entity]
+                                    (update entity ::output concat (->> (get-output entity parents processed-entities joins)
+                                                                (sort-by :timestamp))))))
                         initial-entities)))))
 
 
