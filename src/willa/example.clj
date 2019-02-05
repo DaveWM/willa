@@ -5,7 +5,8 @@
             [loom.graph :as l]
             [willa.streams :as ws]
             [willa.workflow :as ww]
-            [willa.viz :as wv])
+            [willa.viz :as wv]
+            [willa.experiment :as we])
   (:import (org.apache.kafka.streams.kstream JoinWindows Suppressed Suppressed$BufferConfig TimeWindows)
            (java.time Duration)))
 
@@ -48,42 +49,19 @@
 
 (def entities
   (merge {:topics/input-topic input-topic
-          :topics/secondary-input-topic secondary-input-topic
-          :topics/tertiary-input-topic tertiary-input-topic
           :topics/output-topic output-topic
-          :topics/secondary-output-topic secondary-output-topic
           :stream {::w/entity-type :kstream
                    ::w/xform (comp (map (wu/transform-value inc))
-                                   (filter (wu/value-pred even?)))
-                   }}
-         (ww/dedupe-entities "stream-dedupe")
-         {:suppressed-table {::w/entity-type :ktable
-                             ::w/group-by-fn (fn [[k v]] k)
-                             ::w/aggregate-initial-value 0
-                             ::w/aggregate-adder-fn (fn [acc [k v]]
-                                                      (+ acc v))
-                             ::w/window (.grace (TimeWindows/of 10000) (Duration/ofMillis 10000))
-                             ::w/suppression (Suppressed/untilWindowCloses (Suppressed$BufferConfig/unbounded))}
-          :left-table {::w/entity-type :ktable}
-          :right-table {::w/entity-type :ktable}
-          :table {::w/entity-type :ktable
-                  ::w/group-by-fn (fn [[k v]] (if (even? v) "even" "odd"))
-                  ::w/window (.advanceBy (TimeWindows/of 5000) 2500)
-                  ::w/aggregate-initial-value 0
-                  ::w/aggregate-adder-fn (fn [acc [k v]]
-                                           (+ acc v))}}))
+                                   (filter (wu/value-pred even?)))}}))
 
-(def joins
-  {[:left-table :right-table] {::w/join-type :inner}})
+(def joins {})
 
 
 (defn start! []
-  (let [builder        (streams/streams-builder)
-        built-entities (w/build-workflow!
-                         builder
-                         {:workflow workflow
-                          :entities entities
-                          :joins joins})]
+  (let [builder (doto (streams/streams-builder)
+                  (w/build-workflow! {:workflow workflow
+                                      :entities entities
+                                      :joins joins}))]
     (doto (streams/kafka-streams builder
                                  app-config)
       (.setUncaughtExceptionHandler (reify Thread$UncaughtExceptionHandler
@@ -95,8 +73,7 @@
 
   (require 'jackdaw.client
            'jackdaw.admin
-           '[clojure.core.async :as a]
-           '[willa.experiment :as we])
+           '[clojure.core.async :as a])
 
   (def admin-client (jackdaw.admin/->AdminClient app-config))
   (jackdaw.admin/create-topics! admin-client topics)
@@ -112,7 +89,7 @@
   (def consumer (jackdaw.client/consumer (assoc app-config "group.id" "consumer")
                                          willa.streams/default-serdes))
   (def input-consumer (jackdaw.client/consumer (assoc app-config "group.id" "input-consumer")
-                                         willa.streams/default-serdes))
+                                               willa.streams/default-serdes))
   (jackdaw.client/subscribe consumer [output-topic])
   (jackdaw.client/subscribe input-consumer [input-topic])
 
@@ -135,7 +112,8 @@
   (wv/view-workflow (we/run-experiment {:workflow workflow
                                         :entities entities
                                         :joins joins}
-                                       {:topics/input-topic [{:key "k" :value 1 :timestamp 0}]}))
+                                       {:topics/input-topic (->> (range 5)
+                                                                 (map #(-> {:key "k" :value % :timestamp (* % 100)})))}))
 
 
   (defn reset []
