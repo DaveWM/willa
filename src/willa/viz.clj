@@ -2,7 +2,8 @@
   (:require [loom.graph :as l]
             [rhizome.viz :as r]
             [rhizome.dot :as rd]
-            [willa.core :as w]))
+            [willa.core :as w]
+            [willa.utils :as wu]))
 
 
 (def entity-type->shape
@@ -23,7 +24,7 @@
                                        :or {node-descriptor-fn (constantly {})
                                             cluster-descriptor-fn (constantly {})
                                             show-joins true}}]
-   (let [g               (apply l/digraph workflow)
+   (let [g               (wu/->graph workflow)
          nodes           (l/nodes g)
          nodes->adjacent (->> nodes
                               (map (juxt identity (partial l/successors g)))

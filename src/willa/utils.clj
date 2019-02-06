@@ -1,4 +1,5 @@
-(ns willa.utils)
+(ns willa.utils
+  (:require [loom.graph :as l]))
 
 
 (defn transform-value [f]
@@ -23,3 +24,15 @@
 
 (defn single-elem? [xs]
   (= (count xs) 1))
+
+
+(defn ->graph [workflow]
+  (apply l/digraph workflow))
+
+
+(defn leaves [workflow]
+  (let [g (->graph workflow)]
+    (->> g
+         (l/nodes)
+         (filter #(empty? (l/successors g %)))
+         set)))

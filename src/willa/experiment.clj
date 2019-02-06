@@ -2,7 +2,8 @@
   (:require [loom.graph :as l]
             [loom.alg :as lalg]
             [willa.core :as w]
-            [clojure.math.combinatorics :as combo])
+            [clojure.math.combinatorics :as combo]
+            [willa.utils :as wu])
   (:import (org.apache.kafka.streams.kstream JoinWindows TimeWindows SessionWindows)))
 
 
@@ -205,7 +206,7 @@
 
 
 (defn run-experiment [{:keys [workflow entities joins] :as world} entity->records]
-  (let [g                (apply l/digraph workflow)
+  (let [g                (wu/->graph workflow)
         initial-entities (->> entities
                               (map (fn [[k v]] [k (assoc v ::output (get entity->records k))]))
                               (into {}))]

@@ -102,7 +102,7 @@
 
 
 (defn- build-workflow!* [builder {:keys [workflow entities joins]} overrides]
-  (let [g (apply l/digraph workflow)]
+  (let [g (wu/->graph workflow)]
     (->> g
          (lalg/topsort)
          (map (juxt identity (partial l/predecessors g)))
