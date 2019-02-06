@@ -6,7 +6,8 @@
             [loom.graph :as l]
             [willa.experiment :as we]
             [willa.core :as w]
-            [willa.utils :as wu])
+            [willa.utils :as wu]
+            [willa.workflow :as ww])
   (:import (java.util Properties)
            (org.apache.kafka.streams TopologyTestDriver)))
 
@@ -38,69 +39,61 @@
          (filter #(empty? (l/successors g %)))
          set)))
 
-
-(defmulti transport (fn [type builder config world]
-                      type))
-
-(defmethod transport :mock [_ builder config world]
+(defn mock-transport [builder config world]
   (let [driver (test-driver builder config)]
     (-> (jt/mock-transport {:driver driver}
-                           (->> (:entities world)
-                                (filter (fn [[k# v#]]
-                                          (= :topic (::w/entity-type v#))))
-                                (map (fn [[_# t#]] [(:topic-name t#) t#]))
-                                (into {})))
+                           (ww/get-topic-name->metadata (:entities world)))
         (update :exit-hooks conj (fn [] (.close driver))))))
 
 
-(defmacro with-test-machine [name {:keys [transport-type builder world]} & body]
-  `(let [config# {"application.id" "test"
-                  "bootstrap.servers" "localhost:9092"
-                  "cache.max.bytes.buffering" "0"}]
-     (with-open [~name (jt/test-machine (transport ~transport-type ~builder config# ~world))]
-       ~@body)))
+(defmacro with-test-machine [name transport & body]
+  `(with-open [~name (jt/test-machine ~transport)]
+     ~@body))
 
 
-(defn exercise-workflow [transport-type world inputs]
+(defn exercise-workflow [world inputs]
   (let [experiment-entities (:entities (we/run-experiment world inputs))
         builder             (doto (streams/streams-builder)
                               (w/build-workflow! world))
-        output-topic-keys   (leaves (:workflow world))]
-    (with-test-machine tm {:builder builder
-                           :world world
-                           :transport-type transport-type}
-                       (let [results               (jt/run-test
-                                                     tm
-                                                     (concat
-                                                       (->> inputs
-                                                            (mapcat (fn [[e rs]]
-                                                                      (map vector (repeat e) rs)))
-                                                            (sort-by (wu/value-pred :timestamp))
-                                                            (map (fn [[e r]]
-                                                                   [:write!
-                                                                    (:topic-name (get experiment-entities e))
-                                                                    (:value r) {:key (:key r)
-                                                                                :timestamp (:timestamp r)}])))
-                                                       [[:watch (fn [journal]
-                                                                  (->> output-topic-keys
-                                                                       (every? (fn [t]
-                                                                                 (= (count (get-in journal [:topics (:topic-name (get experiment-entities t))]))
-                                                                                    (count (get-in experiment-entities [t ::we/output])))))))]]))
-                             test-topology-results (->> (get-in results [:journal :topics])
-                                                        (map (wu/transform-key #(->> (:entities world)
-                                                                                     (filter (fn [[k v]] (= % (:topic-name v))))
-                                                                                     (map key)
-                                                                                     first)))
-                                                        (map (wu/transform-value (partial sort-by :offset)))
-                                                        (filter (wu/key-pred output-topic-keys))
-                                                        (into {}))
-                             experiment-results    (->> experiment-entities
-                                                        (filter (wu/key-pred output-topic-keys))
-                                                        (map (wu/transform-value #(->> (::we/output %)
-                                                                                       (sort-by :timestamp))))
-                                                        (into {}))]
-                         {:official-results test-topology-results
-                          :experiment-results experiment-results}))))
+        output-topic-keys   (leaves (:workflow world))
+        kafka-config        {"application.id" "test"
+                             "bootstrap.servers" "localhost:9092"
+                             "cache.max.bytes.buffering" "0"
+                             "group.key" "test-group"}
+        transport           (mock-transport builder kafka-config world)]
+    (with-test-machine tm transport
+      (let [results               (jt/run-test
+                                    tm
+                                    (concat
+                                      (->> inputs
+                                           (mapcat (fn [[e rs]]
+                                                     (map vector (repeat e) rs)))
+                                           (sort-by (wu/value-pred :timestamp))
+                                           (map (fn [[e r]]
+                                                  [:write!
+                                                   (:topic-name (get experiment-entities e))
+                                                   (:value r) {:key (:key r)
+                                                               :timestamp (:timestamp r)}])))
+                                      [[:watch (fn [journal]
+                                                 (->> output-topic-keys
+                                                      (every? (fn [t]
+                                                                (= (count (get-in journal [:topics (:topic-name (get experiment-entities t))]))
+                                                                   (count (get-in experiment-entities [t ::we/output])))))))]]))
+            test-topology-results (->> (get-in results [:journal :topics])
+                                       (map (wu/transform-key #(->> (:entities world)
+                                                                    (filter (fn [[k v]] (= % (:topic-name v))))
+                                                                    (map key)
+                                                                    first)))
+                                       (map (wu/transform-value (partial sort-by :offset)))
+                                       (filter (wu/key-pred output-topic-keys))
+                                       (into {}))
+            experiment-results    (->> experiment-entities
+                                       (filter (wu/key-pred output-topic-keys))
+                                       (map (wu/transform-value #(->> (::we/output %)
+                                                                      (sort-by :timestamp))))
+                                       (into {}))]
+        {:official-results test-topology-results
+         :experiment-results experiment-results}))))
 
 
 (defn compare-results [output-topics & results]
@@ -109,4 +102,4 @@
                             (map (wu/transform-value (partial map #(select-keys % [:key :value]))))))]
     (->> results
          (map ->comparable)
-         (apply =))) )
+         (apply =))))

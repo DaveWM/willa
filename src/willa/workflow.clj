@@ -22,3 +22,11 @@
   [[from (keyword "dedupe" (str name "-table"))]
    [(keyword "dedupe" (str name "-table")) (keyword "dedupe" (str name "-stream"))]
    [(keyword "dedupe" (str name "-stream")) to]])
+
+
+(defn get-topic-name->metadata [entities]
+  (->> entities
+       (filter (fn [[k v]]
+                 (= :topic (::w/entity-type v))))
+       (map (fn [[_ t]] [(:topic-name t) t]))
+       (into {})))

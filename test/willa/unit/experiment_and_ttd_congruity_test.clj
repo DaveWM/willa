@@ -7,7 +7,7 @@
 
 
 (defn congruous? [world inputs]
-  (let [{:keys [official-results experiment-results]} (u/exercise-workflow :mock world inputs)
+  (let [{:keys [official-results experiment-results]} (u/exercise-workflow world inputs)
         output-topics (u/leaves (:workflow world))]
     (u/compare-results output-topics official-results experiment-results)))
 
