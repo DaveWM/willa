@@ -36,3 +36,11 @@
          (l/nodes)
          (filter #(empty? (l/successors g %)))
          set)))
+
+
+(defn get-topic-name->metadata [entities]
+  (->> entities
+       (filter (fn [[k v]]
+                 (= :topic (:willa.core/entity-type v))))
+       (map (fn [[_ t]] [(:topic-name t) t]))
+       (into {})))

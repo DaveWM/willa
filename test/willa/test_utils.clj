@@ -35,7 +35,7 @@
 (defn mock-transport [builder config world]
   (let [driver (test-driver builder config)]
     (-> (jt/mock-transport {:driver driver}
-                           (ww/get-topic-name->metadata (:entities world)))
+                           (wu/get-topic-name->metadata (:entities world)))
         (update :exit-hooks conj (fn [] (.close driver))))))
 
 
