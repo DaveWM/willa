@@ -12,4 +12,5 @@
   :repositories [["confluent" "https://packages.confluent.io/maven/"]
                  ["clojars" "https://clojars.org/repo/"]]
   :profiles {:test {:dependencies [[org.apache.kafka/kafka-streams-test-utils "2.1.0"]
-                                   [log4j/log4j "1.2.17"]]}})
+                                   [log4j/log4j "1.2.17"]]}
+             :dev {:dependencies [[org.clojure/test.check "0.9.0"]]}})
