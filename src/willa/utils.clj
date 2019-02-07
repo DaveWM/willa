@@ -38,6 +38,14 @@
          set)))
 
 
+(defn roots [workflow]
+  (let [g (->graph workflow)]
+    (->> g
+         (l/nodes)
+         (filter #(empty? (l/predecessors g %)))
+         set)))
+
+
 (defn get-topic-name->metadata [entities]
   (->> entities
        (filter (fn [[k v]]
