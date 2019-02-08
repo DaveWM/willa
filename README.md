@@ -1,5 +1,5 @@
-# willa
-**Work In Progress**
+# willa [![CircleCI](https://circleci.com/gh/DaveWM/willa.svg?style=svg)](https://circleci.com/gh/DaveWM/willa)
+**Alpha**
 
 
 Willa translates from a data-driven DSL to the Kafka Streams DSL.
