@@ -44,48 +44,52 @@
      ~@body))
 
 
+(defn run-test-machine [builder {:keys [entities] :as world} inputs watch-fn]
+  (let [kafka-config {"application.id" "test"
+                      "bootstrap.servers" "localhost:9092"
+                      "cache.max.bytes.buffering" "0"
+                      "group.key" "test-group"}
+        transport    (mock-transport builder kafka-config world)]
+    (with-test-machine tm {:transport transport}
+      (let [results (jt/run-test
+                      tm
+                      (concat
+                        (->> inputs
+                             (mapcat (wu/transform-values identity))
+                             (sort-by (wu/value-pred :timestamp))
+                             (map (fn [[e r]]
+                                    [:write!
+                                     (:topic-name (get entities e))
+                                     (:value r) {:key (:key r)
+                                                 :timestamp (:timestamp r)}])))
+                        [[:watch watch-fn]]))]
+        (->> (get-in results [:journal :topics])
+             (map (wu/transform-key #(->> entities
+                                          (filter (fn [[k v]] (= % (:topic-name v))))
+                                          (map key)
+                                          first)))
+             (map (wu/transform-value (partial sort-by :offset)))
+             (into {}))))))
+
+
 (defn exercise-workflow [world inputs]
   (let [experiment-entities (:entities (we/run-experiment world inputs))
-        builder             (doto (streams/streams-builder)
-                              (w/build-workflow! world))
         output-topic-keys   (wu/leaves (:workflow world))
-        kafka-config        {"application.id" "test"
-                             "bootstrap.servers" "localhost:9092"
-                             "cache.max.bytes.buffering" "0"
-                             "group.key" "test-group"}
-        transport           (mock-transport builder kafka-config world)]
-    (with-test-machine tm {:transport transport}
-      (let [results            (jt/run-test
-                                 tm
-                                 (concat
-                                   (->> inputs
-                                        (mapcat (wu/transform-values identity))
-                                        (sort-by (wu/value-pred :timestamp))
-                                        (map (fn [[e r]]
-                                               [:write!
-                                                (:topic-name (get experiment-entities e))
-                                                (:value r) {:key (:key r)
-                                                            :timestamp (:timestamp r)}])))
-                                   [[:watch (fn [journal]
-                                              (->> output-topic-keys
-                                                   (every? (fn [t]
-                                                             (= (count (get-in journal [:topics (:topic-name (get experiment-entities t))]))
-                                                                (count (get-in experiment-entities [t ::we/output])))))))]]))
-            ttd-results        (->> (get-in results [:journal :topics])
-                                    (map (wu/transform-key #(->> (:entities world)
-                                                                 (filter (fn [[k v]] (= % (:topic-name v))))
-                                                                 (map key)
-                                                                 first)))
-                                    (map (wu/transform-value (partial sort-by :offset)))
-                                    (filter (wu/key-pred output-topic-keys))
-                                    (into {}))
-            experiment-results (->> experiment-entities
-                                    (filter (wu/key-pred output-topic-keys))
-                                    (map (wu/transform-value #(->> (::we/output %)
-                                                                   (sort-by :timestamp))))
-                                    (into {}))]
-        {:official-results ttd-results
-         :experiment-results experiment-results}))))
+        builder             (doto (streams/streams-builder)
+                              (w/build-workflow! world))]
+    (let [ttd-results        (run-test-machine builder world inputs
+                                               (fn [journal]
+                                                 (->> output-topic-keys
+                                                      (every? (fn [t]
+                                                                (= (count (get-in journal [:topics (:topic-name (get experiment-entities t))]))
+                                                                   (count (get-in experiment-entities [t ::we/output]))))))))
+          experiment-results (->> experiment-entities
+                                  (filter (wu/key-pred output-topic-keys))
+                                  (map (wu/transform-value #(->> (::we/output %)
+                                                                 (sort-by :timestamp))))
+                                  (into {}))]
+      {:official-results ttd-results
+       :experiment-results experiment-results})))
 
 
 (defn results-congruous? [output-topics & results]
