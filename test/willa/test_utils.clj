@@ -72,12 +72,16 @@
              (into {}))))))
 
 
+(defn run-tm-for-workflow [world inputs watch-fn]
+  (let [builder (doto (streams/streams-builder)
+                  (w/build-workflow! world))]
+    (run-test-machine builder world inputs watch-fn)))
+
+
 (defn exercise-workflow [world inputs]
   (let [experiment-entities (:entities (we/run-experiment world inputs))
-        output-topic-keys   (wu/leaves (:workflow world))
-        builder             (doto (streams/streams-builder)
-                              (w/build-workflow! world))]
-    (let [ttd-results        (run-test-machine builder world inputs
+        output-topic-keys   (wu/leaves (:workflow world))]
+    (let [ttd-results        (run-tm-for-workflow world inputs
                                                (fn [journal]
                                                  (->> output-topic-keys
                                                       (every? (fn [t]
