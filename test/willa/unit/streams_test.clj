@@ -47,7 +47,7 @@
           {:input-topic [{:key "k" :value 1 :timestamp 100}
                          {:key "k" :value 2 :timestamp 100}]}
           (fn [journal]
-            (= 1 (count (get-in journal [:topics "output"])))))
+            (= 2 (count (get-in journal [:topics "output"])))))
 
         {:output-topic [{:key "k" :value 1}
                         {:key "k" :value 3}]}))))
