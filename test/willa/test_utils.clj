@@ -32,10 +32,10 @@
          ws/default-serdes))
 
 
-(defn mock-transport [builder config world]
+(defn mock-transport [builder config topology]
   (let [driver (test-driver builder config)]
     (-> (jt/mock-transport {:driver driver}
-                           (wu/get-topic-name->metadata (:entities world)))
+                           (wu/get-topic-name->metadata (:entities topology)))
         (update :exit-hooks conj (fn [] (.close driver))))))
 
 
@@ -44,12 +44,12 @@
      ~@body))
 
 
-(defn run-test-machine [builder {:keys [entities] :as world} inputs watch-fn]
+(defn run-test-machine [builder {:keys [entities] :as topology} inputs watch-fn]
   (let [kafka-config {"application.id" "test"
                       "bootstrap.servers" "localhost:9092"
                       "cache.max.bytes.buffering" "0"
                       "group.key" "test-group"}
-        transport    (mock-transport builder kafka-config world)]
+        transport    (mock-transport builder kafka-config topology)]
     (with-test-machine tm {:transport transport}
       (let [results (jt/run-test
                       tm
@@ -72,16 +72,16 @@
              (into {}))))))
 
 
-(defn run-tm-for-workflow [world inputs watch-fn]
+(defn run-tm-for-workflow [topology inputs watch-fn]
   (let [builder (doto (streams/streams-builder)
-                  (w/build-workflow! world))]
-    (run-test-machine builder world inputs watch-fn)))
+                  (w/build-topology! topology))]
+    (run-test-machine builder topology inputs watch-fn)))
 
 
-(defn exercise-workflow [world inputs]
-  (let [experiment-entities (:entities (we/run-experiment world inputs))
-        output-topic-keys   (wu/leaves (:workflow world))]
-    (let [ttd-results        (run-tm-for-workflow world inputs
+(defn exercise-workflow [topology inputs]
+  (let [experiment-entities (:entities (we/run-experiment topology inputs))
+        output-topic-keys   (wu/leaves (:workflow topology))]
+    (let [ttd-results        (run-tm-for-workflow topology inputs
                                                (fn [journal]
                                                  (->> output-topic-keys
                                                       (every? (fn [t]

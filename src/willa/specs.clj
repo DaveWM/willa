@@ -114,7 +114,7 @@
 (s/def ::joins (s/map-of ::join-keys ::join))
 
 
-(s/def ::world
+(s/def ::topology
   (let [all-roots-topics?  (fn [{:keys [workflow entities]}]
                              (->> (wu/roots workflow)
                                   (map entities)

@@ -36,7 +36,7 @@ It can also be used for unit testing. This mechanism is similar in scope to Kafk
 
 ## Getting Started
 
-Willa represents your topology as a `world`. The `world` is a map, containing 3 keys:
+Willa represents your topology as a map. The `topology` is a map, containing 3 keys:
 * `:entities` - an entity is a map containing the information needed to build a topic/`kstream`/`KTable`. The `:entities` map is a map of entity name to config.
 * `:workflow` - a vector of tuples of `[input-entity-name output-entity-name]`, similar to a `workflow` in Onyx.
 * `:joins` - this is a map representing all the joins/merges in your topology as data. It is a map of a vector of entity names to join, to a join config.

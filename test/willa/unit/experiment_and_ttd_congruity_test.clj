@@ -6,9 +6,9 @@
   (:import (org.apache.kafka.streams.kstream JoinWindows TimeWindows)))
 
 
-(defn congruous? [world inputs]
-  (let [{:keys [official-results experiment-results]} (u/exercise-workflow world inputs)
-        output-topics (wu/leaves (:workflow world))]
+(defn congruous? [topology inputs]
+  (let [{:keys [official-results experiment-results]} (u/exercise-workflow topology inputs)
+        output-topics (wu/leaves (:workflow topology))]
     (u/results-congruous? output-topics official-results experiment-results)))
 
 

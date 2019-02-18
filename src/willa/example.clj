@@ -59,9 +59,9 @@
 
 (defn start! []
   (let [builder (doto (streams/streams-builder)
-                  (w/build-workflow! {:workflow workflow
+                  (w/build-topology! {:workflow workflow
                                       :entities entities
-                                      :joins joins}))]
+                                      :joins    joins}))]
     (doto (streams/kafka-streams builder
                                  app-config)
       (.setUncaughtExceptionHandler (reify Thread$UncaughtExceptionHandler

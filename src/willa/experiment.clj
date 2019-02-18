@@ -205,12 +205,12 @@
                                                             (drop 1)))))))
 
 
-(defn run-experiment [{:keys [workflow entities joins] :as world} entity->records]
+(defn run-experiment [{:keys [workflow entities joins] :as topology} entity->records]
   (let [g                (wu/->graph workflow)
         initial-entities (->> entities
                               (map (fn [[k v]] [k (assoc v ::output (get entity->records k))]))
                               (into {}))]
-    (assoc world :entities
+    (assoc topology :entities
            (->> g
                 (lalg/topsort)
                 (map (juxt identity (partial l/predecessors g)))
@@ -232,7 +232,7 @@
                  [:tertiary-input-topic :stream]
                  [:stream :output-topic]])
 
-  (def experiment-world
+  (def experiment-topology
     (run-experiment {:workflow workflow
                      :entities {:input-topic {::w/entity-type :topic}
                                 :secondary-input-topic {::w/entity-type :topic}
@@ -250,5 +250,5 @@
                                               :value 2
                                               :timestamp 1000}]}))
 
-  (willa.viz/view-workflow experiment-world)
+  (willa.viz/view-workflow experiment-topology)
   )

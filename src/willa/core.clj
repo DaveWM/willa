@@ -101,7 +101,7 @@
 
 
 
-(defn- build-workflow!* [builder {:keys [workflow entities joins]} overrides]
+(defn- build-topology!* [builder {:keys [workflow entities joins]} overrides]
   (let [g (wu/->graph workflow)]
     (->> g
          (lalg/topsort)
@@ -115,8 +115,8 @@
                  entities))))
 
 
-(def build-workflow-unsafe! build-workflow!*)
+(def build-topology-unsafe! build-topology!*)
 
 
-(defn build-workflow! [builder world]
-  (build-workflow!* builder world {}))
+(defn build-topology! [builder topology]
+  (build-topology!* builder topology {}))
