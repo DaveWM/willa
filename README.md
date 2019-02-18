@@ -188,16 +188,23 @@ The code looks like this:
 ### Entity Config
 | Key | Required? | Valid Entity Types | Description |
 | --- | --- | --- | --- |
+| `:willa.core/entity-type` | ☑ | All | The type of the entity. Can be one of: `:topic`, `:kstream`, or `:ktable`| 
 | `:topic-name` | ☑ | `:topic` | The name of the topic |
 | `:key-serde` | ☑ | `:topic` | The serde to use to serialize/deserialize the keys of records on the topic |
 | `:value-serde` | ☑ | `:topic` | The serde to use to serialize/deserialize the values of records on the topic |
 | `:willa.core/xform` | ❌ | `:kstream` | A transducer to apply to the `KStream`|
 | `:willa.core/group-by-fn` | ❌ | `:ktable` | A function which takes a key-value pair, and returns the key of the group|
-| `:willa.core/window` | ❌ | `:ktable` | The windowing to apply after grouping the input records. If this key is present, `:willa.core/group-by` must also be provided. Will cause the input to be coerced to a `KStream`|
+| `:willa.core/window` | ❌ | `:ktable` | The windowing to apply after grouping the input records. Should be either a [Windows](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/Windows.html) or a [SessionWindows](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/SessionWindows.html) object. If this key is present, `:willa.core/group-by` must also be provided. Will cause the input to be coerced to a `KStream`|
 | `:willa.core/aggregate-initial-value` | ❌ | `:ktable` | The initial value to use in an aggregation. Must be provided if `:willa.core/aggregate-adder-fn` is present|
 | `:willa.core/aggregate-adder-fn` | ❌ | `:ktable` | The aggregator function if the input is a `KStream`, or the ["adder" function](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KGroupedTable.html#aggregate-org.apache.kafka.streams.kstream.Initializer-org.apache.kafka.streams.kstream.Aggregator-org.apache.kafka.streams.kstream.Aggregator) if it is a `KTable`|
 | `:willa.core/aggregate-subtractor-fn` | ❌ | `:ktable` | The aggregate ["subtractor" function](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KGroupedTable.html#aggregate-org.apache.kafka.streams.kstream.Initializer-org.apache.kafka.streams.kstream.Aggregator-org.apache.kafka.streams.kstream.Aggregator-), only valid if the input is a `KTable`|
-| `:willa.core/suppression` | ❌ | `:ktable` | A [Suppressed](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/Suppressed.html) object that determines how updates to the `KTable` are emitted. See [the Kafka Streams docs](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/KTable.html#suppress-org.apache.kafka.streams.kstream.Suppressed-) for more info|    
+| `:willa.core/suppression` | ❌ | `:ktable` | A [Suppressed](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/Suppressed.html) object that determines how updates to the `KTable` are emitted. See [the Kafka Streams docs](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/KTable.html#suppress-org.apache.kafka.streams.kstream.Suppressed-) for more info|
+
+### Join Config
+| Key | Description |
+| --- | --- |
+| `:willa.core/join-type` | The type of the join. Can be one of `:merge`, `:left`, `:inner` or `:outer`.|
+| `:willa.core/window` | A [JoinWindows](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/JoinWindows.html) object that specifies the windowing to be used in the join. Not used when the join type is `:merge` |     
 
 ## License
 
