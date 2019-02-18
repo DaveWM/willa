@@ -1,12 +1,12 @@
-# willa [![CircleCI](https://circleci.com/gh/DaveWM/willa.svg?style=svg)](https://circleci.com/gh/DaveWM/willa)
+# willa [![CircleCI](https://circleci.com/gh/DaveWM/willa.svg?style=svg)](https://circleci.com/gh/DaveWM/willa) [![Clojars Project](https://img.shields.io/clojars/v/willa.svg)](https://clojars.org/willa)
 **Alpha**
 
 
 Willa provides a data-driven DSL on top of the [Kafka Streams DSL](https://docs.confluent.io/current/streams/developer-guide/dsl-api.html),
-built on top of Jackdaw.
+built on top of Jackdaw. It is inspired by [Onyx](http://www.onyxplatform.org).
 
 It is named after [Willa Muir](https://en.wikipedia.org/wiki/Willa_Muir), who translated Kafka's "The Metamorphosis".
-Her husband Edwin was also involved, but apparently he "only helped".
+Her husband Edwin was also involved, but [apparently he "only helped"](https://en.wikipedia.org/wiki/Willa_Muir).
 
 ## Rationale
 
@@ -36,20 +36,22 @@ It can also be used for unit testing. This mechanism is similar in scope to Kafk
 
 ## Getting Started
 
-Willa represents your topology as a map. The `topology` is a map, containing 3 keys:
-* `:entities` - an entity is a map containing the information needed to build a topic/`kstream`/`KTable`. The `:entities` map is a map of entity name to config.
-* `:workflow` - a vector of tuples of `[input-entity-name output-entity-name]`, similar to a `workflow` in Onyx.
-* `:joins` - this is a map representing all the joins/merges in your topology as data. It is a map of a vector of entity names to join, to a join config.
+Willa represents your topology as a map, containing 3 keys:
+* `:entities` - an entity is a map containing information about a topic, `kstream`, or `KTable`. The `:entities` map is a map of identifier to entity.
+* `:workflow` - a vector of tuples of `[input-entity-id output-entity-id]`, similar to a [workflow in Onyx](http://www.onyxplatform.org/docs/cheat-sheet/latest/#job/:workflow).
+* `:joins` - this is a map representing all the joins/merges in your topology as data. It is a map of a vector of entity names involved in the join, to a join config.
 
-This may sound very confusing, but let's try to clear things up with a simple example.
-Before we start, make sure you have a Kafka broker running locally, either using the Confluent distribution or Landoop's fast-data-dev docker image.
+This may sound confusing, but let's try to clear things up with a simple example.
+Before we start, make sure you have a Kafka broker running locally, either using the [Confluent distribution](https://www.confluent.io/product/confluent-platform) or [Landoop's fast-data-dev docker image](https://github.com/Landoop/fast-data-dev).
+Also, if you don't have an existing application, create one by running `lein new my-cool-app`.
 
 Say we want a topology that simply reads messages from an input topic, increments the value, then writes to an output topic.
 The topology would look like this:
 
-;; TODO - Diagram
+![Simple Topology](resources/simple-topology.png)
 
-Let's start by requiring some necessary namespaces:
+Start by adding `[willa "0.1.0-SNAPSHOT"]` to your `project.clj`.
+Next, we'll require some necessary namespaces:
 
 ```clojure
 (ns my-cool-app.core
@@ -67,22 +69,21 @@ We then create the workflow like so:
 ```
 
 You can see that data will flow from the `:input-topic` to the `:increment-stream`, then from `:increment-stream` to the `:output-topic`.
-
 Now we need to tell Willa what exactly the `:input-topic`, `:increment-stream` and `:output-topic` entities are.
 To do this, we'll create the entity config map. It looks like this:
 
 ```clojure
 (def entities
-  {:input-topic {:willa.core/entity-type :topic
+  {:input-topic {::w/entity-type :topic
                  :topic-name "output-topic"
                  :replication-factor 1
                  :partition-count 1
                  :key-serde (serdes.edn/serde)
                  :value-serde (serdes.edn/serde)}
-   :increment-stream {:willa.core/entity-type :kstream
+   :increment-stream {::w/entity-type :kstream
                       :willa.core/xform (map (fn [[k v]] [k (inc v)])) ;; Note that the mapping function expects a key-value tuple
                       }
-   :output-topic {:willa.core/entity-type :topic
+   :output-topic {::w/entity-type :topic
                   :topic-name "output-topic"
                   :replication-factor 1
                   :partition-count 1
@@ -100,16 +101,18 @@ The code looks like this:
 
 ```clojure
 (def app-config
-  {"application.id" "willa-test"
+  {"application.id" "my-cool-app"
    "bootstrap.servers" "localhost:9092"
    "cache.max.bytes.buffering" "0"})
 
+(def topology 
+  {:workflow workflow
+   :entities entities
+   :joins joins})
+
 (defn start! []
   (let [builder   (doto (streams/streams-builder) ;; step 1
-                     (w/build-workflow! ;; step 2
-                       {:workflow workflow
-                        :entities entities
-                        :joins joins}))
+                     (w/build-workflow! topology)) ;; step 2
          kstreams-app (streams/kafka-streams builder app-config) ;; step 3
          ]
     (streams/start kstreams-app) ;; step 4
@@ -140,10 +143,61 @@ You can verify that it works by running the following commands in your repl:
                                               willa.streams/default-serdes))
 (jackdaw.client/subscribe consumer [(:output-topic entities)])
 (jackdaw.client/seek-to-beginning-eager consumer)
+
 ;; should return something like: [{:key "key" :value 2}] 
 (->> (jackdaw.client/poll consumer 200)
      (map #(select-keys % [:key :value])))                                           
 ```
+
+## Going Further
+
+One of the cool features of Willa is that you can visualise your topology. 
+To do this, run these commands in your repl:
+
+```clojure
+(require 'willa.viz)
+
+(willa.viz/view-topology topology)
+```
+
+A diagram of your topology should pop up in a separate window. 
+
+You can also use Willa to experiment with your Topology. 
+For instance, you might want to know what would happen if you receive a message with value `1`. 
+To do this, we'll use the `run-experiment` function in the `willa.experiment` namespace.
+This function takes a `topology` and a map of entity id to records.
+Each record must contain the `:key`, `:value`, and `:timestamp` keys. 
+The code looks like this:
+
+```clojure
+(require 'willa.experiment)
+
+(def experiment-results
+  ;; should return the topology map, but with each entity updated with a :willa.experiment/output key
+  (willa.experiment/run-experiment topology
+                                   {:input-topic [{:key "some-key"
+                                                   :value 1
+                                                   :timestamp 0}]}))
+                                                 
+;; you can now visualise how data flows through the topology in a diagram
+(willa.viz/view-topology experiment-results)                                              
+```
+
+
+## Reference
+### Entity Config
+| Key | Required? | Valid Entity Types | Description |
+| --- | --- | --- | --- |
+| `:topic-name` | [x] | `:topic` | The name of the topic |
+| `:key-serde` | [x] | `:topic` | The serde to use to serialize/deserialize the keys of records on the topic |
+| `:value-serde` | [x] | `:topic` | The serde to use to serialize/deserialize the values of records on the topic |
+| `:willa.core/xform` | [ ] | `:kstream` | A transducer to apply to the `KStream`|
+| `:willa.core/group-by-fn` | [ ] | `:ktable` | A function which takes a key-value pair, and returns the key of the group|
+| `:willa.core/window` | [ ] | `:ktable` | The windowing to apply after grouping the input records. If this key is present, `:willa.core/group-by` must also be provided. Will cause the input to be coerced to a `KStream`|
+| `:willa.core/aggregate-initial-value` | [ ] | `:ktable` | The initial value to use in an aggregation. Must be provided if `:willa.core/aggregate-adder-fn` is present|
+| `:willa.core/aggregate-adder-fn` | [ ] | `:ktable` | The aggregator function if the input is a `KStream`, or the ["adder" function](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KGroupedTable.html#aggregate-org.apache.kafka.streams.kstream.Initializer-org.apache.kafka.streams.kstream.Aggregator-org.apache.kafka.streams.kstream.Aggregator) if it is a `KTable`|
+| `:willa.core/aggregate-subtractor-fn` | [ ] | `:ktable` | The aggregate ["subtractor" function](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KGroupedTable.html#aggregate-org.apache.kafka.streams.kstream.Initializer-org.apache.kafka.streams.kstream.Aggregator-org.apache.kafka.streams.kstream.Aggregator-), only valid if the input is a `KTable`|
+| `:willa.core/suppression` | [ ] | `:ktable` | A [Suppressed](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/Suppressed.html) object that determines how updates to the `KTable` are emitted. See [the Kafka Streams docs](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/KTable.html#suppress-org.apache.kafka.streams.kstream.Suppressed-) for more info|    
 
 ## License
 

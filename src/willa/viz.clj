@@ -58,17 +58,17 @@
          (r/dot->image)))))
 
 
-(def view-workflow (comp r/view-image make-image))
+(def view-topology (comp r/view-image make-image))
 
 
-(defn save-workflow [filename & args]
+(defn save-topology [filename & args]
   (-> (apply make-image args)
       (r/save-image filename)))
 
 
 (comment
 
-  (view-workflow {:workflow [[:topics/input-topic :stream]
+  (view-topology {:workflow [[:topics/input-topic :stream]
                              [:stream :table]
                              [:table :topics/output-topic]]
                   :entities {:topics/input-topic {::w/entity-type :topic}

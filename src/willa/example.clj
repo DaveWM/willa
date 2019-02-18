@@ -105,11 +105,11 @@
       (->> (jackdaw.client/poll input-consumer 200)
            (map #(select-keys % [:key :value :timestamp]))))
 
-  (wv/view-workflow {:workflow workflow
+  (wv/view-topology {:workflow workflow
                      :entities entities
                      :joins joins}
                     {:show-joins true})
-  (wv/view-workflow (we/run-experiment {:workflow workflow
+  (wv/view-topology (we/run-experiment {:workflow workflow
                                         :entities entities
                                         :joins joins}
                                        {:topics/input-topic (->> (range 3)

@@ -96,8 +96,8 @@
             (::aggregate-adder-fn entity) (ws/aggregate (::aggregate-initial-value entity)
                                                         (::aggregate-adder-fn entity)
                                                         (::aggregate-subtractor-fn entity))
-            (::suppression entity) (ws/suppress (::suppression entity))
-            true (ws/coerce-to-ktable))))
+            true (ws/coerce-to-ktable)
+            (::suppression entity) (ws/suppress (::suppression entity)))))
 
 
 
