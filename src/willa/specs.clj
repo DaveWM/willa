@@ -16,8 +16,6 @@
     #(gen/return (jackdaw.serdes.edn/serde))))
 (s/def :topic/key-serde :topic/serde)
 (s/def :topic/value-serde :topic/serde)
-(s/def :topic/replication-factor pos-int?)
-(s/def :topic/partition-count pos-int?)
 
 
 (s/def :willa.core/entity-type #{:topic :kstream :ktable})
@@ -58,9 +56,7 @@
     :req [:willa.core/entity-type]
     :req-un [:topic/topic-name
              :topic/key-serde
-             :topic/value-serde
-             :topic/partition-count
-             :topic/replication-factor]))
+             :topic/value-serde]))
 
 (defmethod entity-spec :kstream [_]
   (s/keys
@@ -69,13 +65,13 @@
 
 (defmethod entity-spec :ktable [_]
   (s/keys
-    :req [:willa.core/entity-type
-          :willa.core/group-by-fn
-          :willa.core/aggregate-adder-fn
-          :willa.core/aggregate-initial-value]
+    :req [:willa.core/entity-type]
     :opt [:willa.core/window
           :willa.core/suppression
-          :willa.core/aggregate-subtractor-fn]))
+          :willa.core/aggregate-subtractor-fn
+          :willa.core/group-by-fn
+          :willa.core/aggregate-adder-fn
+          :willa.core/aggregate-initial-value]))
 
 (s/def ::entity (s/multi-spec entity-spec :willa.core/entity-type))
 
@@ -114,7 +110,7 @@
 (s/def ::joins (s/map-of ::join-keys ::join))
 
 
-(s/def ::world
+(s/def ::topology
   (let [all-roots-topics?  (fn [{:keys [workflow entities]}]
                              (->> (wu/roots workflow)
                                   (map entities)
