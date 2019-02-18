@@ -191,13 +191,13 @@ The code looks like this:
 | `:topic-name` | ☑ | `:topic` | The name of the topic |
 | `:key-serde` | ☑ | `:topic` | The serde to use to serialize/deserialize the keys of records on the topic |
 | `:value-serde` | ☑ | `:topic` | The serde to use to serialize/deserialize the values of records on the topic |
-| `:willa.core/xform` | ☐ | `:kstream` | A transducer to apply to the `KStream`|
-| `:willa.core/group-by-fn` | ☐ | `:ktable` | A function which takes a key-value pair, and returns the key of the group|
-| `:willa.core/window` | ☐ | `:ktable` | The windowing to apply after grouping the input records. If this key is present, `:willa.core/group-by` must also be provided. Will cause the input to be coerced to a `KStream`|
-| `:willa.core/aggregate-initial-value` | ☐ | `:ktable` | The initial value to use in an aggregation. Must be provided if `:willa.core/aggregate-adder-fn` is present|
-| `:willa.core/aggregate-adder-fn` | ☐ | `:ktable` | The aggregator function if the input is a `KStream`, or the ["adder" function](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KGroupedTable.html#aggregate-org.apache.kafka.streams.kstream.Initializer-org.apache.kafka.streams.kstream.Aggregator-org.apache.kafka.streams.kstream.Aggregator) if it is a `KTable`|
-| `:willa.core/aggregate-subtractor-fn` | ☐ | `:ktable` | The aggregate ["subtractor" function](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KGroupedTable.html#aggregate-org.apache.kafka.streams.kstream.Initializer-org.apache.kafka.streams.kstream.Aggregator-org.apache.kafka.streams.kstream.Aggregator-), only valid if the input is a `KTable`|
-| `:willa.core/suppression` | ☐ | `:ktable` | A [Suppressed](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/Suppressed.html) object that determines how updates to the `KTable` are emitted. See [the Kafka Streams docs](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/KTable.html#suppress-org.apache.kafka.streams.kstream.Suppressed-) for more info|    
+| `:willa.core/xform` | ❌ | `:kstream` | A transducer to apply to the `KStream`|
+| `:willa.core/group-by-fn` | ❌ | `:ktable` | A function which takes a key-value pair, and returns the key of the group|
+| `:willa.core/window` | ❌ | `:ktable` | The windowing to apply after grouping the input records. If this key is present, `:willa.core/group-by` must also be provided. Will cause the input to be coerced to a `KStream`|
+| `:willa.core/aggregate-initial-value` | ❌ | `:ktable` | The initial value to use in an aggregation. Must be provided if `:willa.core/aggregate-adder-fn` is present|
+| `:willa.core/aggregate-adder-fn` | ❌ | `:ktable` | The aggregator function if the input is a `KStream`, or the ["adder" function](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KGroupedTable.html#aggregate-org.apache.kafka.streams.kstream.Initializer-org.apache.kafka.streams.kstream.Aggregator-org.apache.kafka.streams.kstream.Aggregator) if it is a `KTable`|
+| `:willa.core/aggregate-subtractor-fn` | ❌ | `:ktable` | The aggregate ["subtractor" function](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KGroupedTable.html#aggregate-org.apache.kafka.streams.kstream.Initializer-org.apache.kafka.streams.kstream.Aggregator-org.apache.kafka.streams.kstream.Aggregator-), only valid if the input is a `KTable`|
+| `:willa.core/suppression` | ❌ | `:ktable` | A [Suppressed](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/Suppressed.html) object that determines how updates to the `KTable` are emitted. See [the Kafka Streams docs](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/KTable.html#suppress-org.apache.kafka.streams.kstream.Suppressed-) for more info|    
 
 ## License
 
