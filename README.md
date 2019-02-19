@@ -3,7 +3,7 @@
 
 
 Willa provides a data-driven DSL on top of the [Kafka Streams DSL](https://docs.confluent.io/current/streams/developer-guide/dsl-api.html),
-built on top of Jackdaw. It is inspired by [Onyx](http://www.onyxplatform.org).
+built on top of [Jackdaw](https://github.com/FundingCircle/jackdaw). It is inspired by [Onyx](http://www.onyxplatform.org).
 
 It is named after [Willa Muir](https://en.wikipedia.org/wiki/Willa_Muir), who translated Kafka's "The Metamorphosis".
 Her husband Edwin was also involved, but [apparently he "only helped"](https://en.wikipedia.org/wiki/Willa_Muir).
@@ -25,7 +25,7 @@ It also enables you to visualise your topology using GraphViz, which is very use
 
 Willa uses transducers for stateless transformations, as opposed to a separate API like with the `KStreamsBuilder`.
 Transducers are far more composable, and allow you to re-use code far more effectively.
-You can also test your transformation logic completely independently of Kafka.
+They also enable you to test your transformation logic completely independently of Kafka (and Willa).
 
 Willa also provides a mechanism for experimenting with a topology from the repl, and seeing how data flows through it.
 It can also be used for unit testing. This mechanism is similar in scope to Kafka's `TestTopologyDriver`, but has a few advantages:
@@ -37,7 +37,7 @@ It can also be used for unit testing. This mechanism is similar in scope to Kafk
 ## Getting Started
 
 Willa represents your topology as a map, containing 3 keys:
-* `:entities` - an entity is a map containing information about a topic, `kstream`, or `KTable`. The `:entities` map is a map of identifier to entity.
+* `:entities` - an entity is a map containing information about a topic, `KStream`, or `KTable`. The `:entities` map is a map of identifier to entity.
 * `:workflow` - a vector of tuples of `[input-entity-id output-entity-id]`, similar to a [workflow in Onyx](http://www.onyxplatform.org/docs/cheat-sheet/latest/#job/:workflow).
 * `:joins` - this is a map representing all the joins/merges in your topology as data. It is a map of a vector of entity names involved in the join, to a join config.
 
