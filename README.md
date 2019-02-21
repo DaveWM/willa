@@ -2,10 +2,9 @@
 **Alpha**
 
 
-Willa provides a data-driven DSL on top of the [Kafka Streams DSL](https://docs.confluent.io/current/streams/developer-guide/dsl-api.html),
-built on top of [Jackdaw](https://github.com/FundingCircle/jackdaw). It is inspired by [Onyx](http://www.onyxplatform.org).
+Willa provides a data-driven DSL on top of the [Kafka Streams DSL](https://docs.confluent.io/current/streams/developer-guide/dsl-api.html), inspired by [Onyx](http://www.onyxplatform.org). It uses [Jackdaw](https://github.com/FundingCircle/jackdaw) under the hood.
 
-It is named after [Willa Muir](https://en.wikipedia.org/wiki/Willa_Muir), who translated Kafka's "The Metamorphosis".
+Willa is named after [Willa Muir](https://en.wikipedia.org/wiki/Willa_Muir), who translated Kafka's "The Metamorphosis".
 Her husband Edwin was also involved, but [apparently he "only helped"](https://en.wikipedia.org/wiki/Willa_Muir).
 
 ## Rationale
@@ -13,11 +12,11 @@ Her husband Edwin was also involved, but [apparently he "only helped"](https://e
 The Kafka Streams DSL is very "Javaish". 
 It uses a `KStreamsBuilder` object to build topologies, which operates by in-place mutation.
 This has all the [usual disadvantages](https://clojure.org/about/state#_object_oriented_programming_oo) of mutability, 
-including making topologies more difficult to compose, test, and visualise.
-You do get a `ProcessorTopology` object from the `build` method, which you can theoretically use to manipulate the built topology. However, this is a mutable API, and is extremely difficult to work with in practice - not least because the `ProcessorTopology` class isn't documented.
+including making topologies difficult to compose, test, and visualise.
+The built topology is represented as a `ProcessorTopology` object, which can theoretically be used to manipulate the topology. However, it is extremely difficult to work with in practice - not least because the `ProcessorTopology` class isn't documented.
 The `KStreamsBuilder` API also re-implements many of the stateless transformation functions from the core Clojure library (`map`, `filter`, `mapcat`, etc.), encouraging needless code duplication.
 
-Willa aims to provide an immutable, data-driven DSL (inspired by Onyx) on top of the Kafka Streams DSL.
+Willa aims to provide an immutable, data-driven DSL (inspired by [Onyx](http://www.onyxplatform.org)) on top of the Kafka Streams DSL.
 It represents all aspects of your topology as Clojure data structures and functions.
 This makes topologies far easier to manipulate and compose. For example, if you want to log every message that is published to output topics,
 you can write a generic pure function to transform a Willa topology to achieve this.
