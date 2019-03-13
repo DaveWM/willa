@@ -76,6 +76,18 @@
                                       ::w/aggregate-adder-fn (fn [acc [k v]]
                                                                (+ acc v))}}}
                   {:input-topic [{:key "k" :value 1 :timestamp 0}
+                                 {:key "k" :value 2 :timestamp 500}]}))
+
+  (is (congruous? {:workflow [[:input-topic :table]
+                              [:table :output-topic]]
+                   :entities {:input-topic (u/->topic "input-topic")
+                              :output-topic (u/->topic "output-topic")
+                              :table {::w/entity-type :ktable
+                                      ::w/group-by-fn (fn [[k v]] v)
+                                      ::w/aggregate-initial-value 0
+                                      ::w/aggregate-adder-fn (fn [acc [k v]]
+                                                               (+ acc v))}}}
+                  {:input-topic [{:key "k" :value 1 :timestamp 0}
                                  {:key "k" :value 2 :timestamp 500}]})))
 
 

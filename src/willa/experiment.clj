@@ -195,11 +195,12 @@
                                                   ((::w/group-by-fn entity) ((juxt :key :value) r))))
              (::w/window entity) (mapcat (fn [[g rs]]
                                            (for [w (determine-windows (::w/window entity) rs)]
-                                             [[g w] (records-in-window w rs)])))
+                                             [^:windowed [g w] (records-in-window w rs)])))
              (::w/aggregate-adder-fn entity) (mapcat (fn [[g rs]]
                                                        (->> (reductions (fn [acc r]
-                                                                          (assoc r :value
-                                                                                 ((::w/aggregate-adder-fn entity) (:value acc) ((juxt :key :value) r))))
+                                                                          (assoc r
+                                                                                 :key (if (:windowed (meta g)) (first g) g)
+                                                                                 :value ((::w/aggregate-adder-fn entity) (:value acc) [g (:value r)])))
                                                                         {:value (::w/aggregate-initial-value entity)}
                                                                         rs)
                                                             (drop 1)))))))
