@@ -164,10 +164,13 @@
 (defmulti get-output (fn [entity parents entities joins]
                        (::w/entity-type entity)))
 
-(defmethod get-output :topic [entity parents entities _]
+(defmethod get-output :topic [entity parents entities joins]
   (when parents
-    (->> (map entities parents)
-         (mapcat ::output))))
+    (let [[join-order join-config] (w/get-join joins parents)
+          joined-entity (if join-order
+                          (apply join-entities join-config (map (comp ->joinable entities) join-order))
+                          (get entities (first parents)))]
+      (::output joined-entity))))
 
 (defmethod get-output :kstream [entity parents entities joins]
   (let [[join-order join-config] (w/get-join joins parents)
