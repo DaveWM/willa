@@ -49,7 +49,7 @@ The topology would look like this:
 
 ![Simple Topology](resources/simple-topology.png)
 
-Start by adding `[willa "0.1.0-SNAPSHOT"]` to your `project.clj`.
+Start by adding `[willa "0.1.0"]` to your `project.clj`.
 Next, we'll require some necessary namespaces:
 
 ```clojure
