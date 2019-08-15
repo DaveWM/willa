@@ -167,16 +167,16 @@
 (defmethod get-output :topic [entity parents entities joins]
   (when parents
     (let [[join-order join-config] (w/get-join joins parents)
-          joined-entity (if join-order
-                          (apply join-entities join-config (map (comp ->joinable entities) join-order))
-                          (get entities (first parents)))]
+          joined-entity (apply join-entities 
+                               (or join-config {::w/join-type :merge})
+                               (map (comp ->joinable entities) (or join-order (vec parents))))]
       (::output joined-entity))))
 
 (defmethod get-output :kstream [entity parents entities joins]
   (let [[join-order join-config] (w/get-join joins parents)
-        joined-entity (if join-order
-                        (apply join-entities join-config (map (comp ->joinable entities) join-order))
-                        (get entities (first parents)))
+        joined-entity (apply join-entities 
+                             (or join-config {::w/join-type :merge})
+                             (map (comp ->joinable entities) (or join-order (vec parents))))
         xform         (get entity ::w/xform (map identity))]
     (->> (for [r (::output joined-entity)]
            (into []
@@ -189,9 +189,9 @@
 
 (defmethod get-output :ktable [entity parents entities joins]
   (let [[join-order join-config] (w/get-join joins parents)
-        joined-entity (if join-order
-                        (apply join-entities join-config (map (comp ->joinable entities) join-order))
-                        (get entities (first parents)))]
+        joined-entity (apply join-entities 
+                             (or join-config {::w/join-type :merge})
+                             (map (comp ->joinable entities) (or join-order (vec parents))))]
     (cond->> (::output joined-entity)
              true (sort-by :timestamp)
              (::w/group-by-fn entity) (group-by (fn [r]
