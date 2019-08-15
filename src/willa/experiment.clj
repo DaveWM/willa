@@ -226,6 +226,14 @@
                         initial-entities)))))
 
 
+(defn results-only [experiment-results]
+  (->> experiment-results
+       :entities
+       (map (fn [[k v]]
+              [k (::output v)]))
+       (into {}))) 
+
+
 (comment
 
   (require 'willa.viz)
