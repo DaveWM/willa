@@ -106,8 +106,7 @@ The code looks like this:
 
 (def topology 
   {:workflow workflow
-   :entities entities
-   :joins joins})
+   :entities entities})
 
 (defn start! []
   (let [builder   (doto (streams/streams-builder) ;; step 1
