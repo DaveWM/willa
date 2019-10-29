@@ -3,7 +3,6 @@
             [jackdaw.serdes.edn :as serdes.edn]
             [loom.graph :as l]
             [loom.alg :as lalg]
-            rhizome.viz
             [willa.streams :as ws]
             [willa.utils :as wu])
   (:import (org.apache.kafka.streams.kstream Windowed)))
