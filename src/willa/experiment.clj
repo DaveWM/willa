@@ -61,6 +61,25 @@
                  :value (join-fn (:value l) (:value r))
                  :timestamp ((fnil max 0 0) (:timestamp l) (:timestamp r))})))))
 
+(defn join-kstream-ktable-results [kstream-results ktable-results {:keys [left-join right-join join-fn]
+                                                       :or {join-fn vector}}]
+  (let [sorted-right-results (sort-by :timestamp ktable-results)
+        left-joined          (->> kstream-results
+                                  (map (fn [result]
+                                         [result
+                                          (->> sorted-right-results
+                                               (filter #(and (<= (:timestamp %) (:timestamp result))
+                                                             (= (:key %) (:key result))))
+                                               last)])))]
+    (->> left-joined
+         (filter (fn [[l r]]
+                   (and (or (not left-join) (some? l))
+                        (or (not right-join) (some? r)))))
+         (map (fn [[l r]]
+                {:key (:key (or l r))
+                 :value (join-fn (:value l) (:value r))
+                 :timestamp ((fnil max 0 0) (:timestamp l) (:timestamp r))})))))
+
 
 (defmulti join-entities* (fn [join-config entity other join-fn]
                            [(::w/join-type join-config) (::w/entity-type entity) (::w/entity-type other)]))
@@ -100,6 +119,16 @@
   (assoc entity ::output (join-ktable-results (::output entity) (::output other) {:left-join false
                                                                                   :right-join false
                                                                                   :join-fn join-fn})))
+
+(defmethod join-entities* [:inner :kstream :ktable] [_ entity other join-fn]
+  (assoc entity ::output (join-kstream-ktable-results (::output entity) (::output other) {:left-join true
+                                                                                          :right-join true
+                                                                                          :join-fn join-fn})))
+
+(defmethod join-entities* [:left :kstream :ktable] [_ entity other join-fn]
+  (assoc entity ::output (join-kstream-ktable-results (::output entity) (::output other) {:left-join true
+                                                                                          :right-join false
+                                                                                          :join-fn join-fn})))
 
 
 (defn ->joinable [entity]
