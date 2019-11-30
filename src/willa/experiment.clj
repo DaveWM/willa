@@ -269,27 +269,28 @@
 
 
   (def workflow [[:input-topic :stream]
-                 [:secondary-input-topic :stream]
-                 [:tertiary-input-topic :stream]
-                 [:stream :output-topic]])
+                 [:secondary-input-topic :table]
+                 [:stream :output-topic]
+                 [:table :output-topic]])
+
+  (def joins {[:stream :table] {::w/join-type :left}})
 
   (def experiment-topology
     (run-experiment {:workflow workflow
                      :entities {:input-topic {::w/entity-type :topic}
                                 :secondary-input-topic {::w/entity-type :topic}
-                                :tertiary-input-topic {::w/entity-type :topic}
-                                :stream {::w/entity-type :kstream
-                                         ::w/xform (map (fn [[k vs]]
-                                                          [k (apply max (remove nil? vs))]))}
+                                :stream {::w/entity-type :kstream}
+                                :table {::w/entity-type :ktable}
                                 :output-topic {::w/entity-type :topic}}
-                     :joins {[:input-topic :secondary-input-topic :tertiary-input-topic] {::w/join-type :outer
-                                                                                          ::w/window (JoinWindows/of 1000)}}}
+                     :joins joins}
                     {:input-topic [{:key "key"
                                     :value 1
-                                    :timestamp 500}]
+                                    :timestamp 1000}]
                      :secondary-input-topic [{:key "key"
                                               :value 2
-                                              :timestamp 1000}]}))
+                                              :timestamp 1100}]}))
+
+  (results-only experiment-topology)
 
   (willa.viz/view-topology experiment-topology)
   )

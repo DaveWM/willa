@@ -12,8 +12,8 @@
 (s/def :topic/topic-name string?)
 (s/def :topic/serde
   (s/with-gen
-    #(instance? Serde %)
-    #(gen/return (jackdaw.serdes.edn/serde))))
+   #(instance? Serde %)
+   #(gen/return (jackdaw.serdes.edn/serde))))
 (s/def :topic/key-serde :topic/serde)
 (s/def :topic/value-serde :topic/serde)
 
@@ -53,25 +53,37 @@
 
 (defmethod entity-spec :topic [_]
   (s/keys
-    :req [:willa.core/entity-type]
-    :req-un [:topic/topic-name
-             :topic/key-serde
-             :topic/value-serde]))
+   :req [:willa.core/entity-type]
+   :req-un [:topic/topic-name
+            :topic/key-serde
+            :topic/value-serde]))
 
 (defmethod entity-spec :kstream [_]
   (s/keys
-    :req [:willa.core/entity-type]
-    :opt [:willa.core/xform]))
+   :req [:willa.core/entity-type]
+   :opt [:willa.core/xform]))
 
 (defmethod entity-spec :ktable [_]
-  (s/keys
-    :req [:willa.core/entity-type]
-    :opt [:willa.core/window
-          :willa.core/suppression
-          :willa.core/aggregate-subtractor-fn
-          :willa.core/group-by-fn
-          :willa.core/aggregate-adder-fn
-          :willa.core/aggregate-initial-value]))
+  (s/and (s/keys
+          :req [:willa.core/entity-type]
+          :opt [:willa.core/window
+                :willa.core/suppression
+                :willa.core/aggregate-subtractor-fn
+                :willa.core/group-by-fn
+                :willa.core/aggregate-adder-fn
+                :willa.core/aggregate-initial-value])
+         (fn dependent-keys-present [m]
+           (let [m-keys (set (keys m))]
+             (if-not (empty? (clojure.set/intersection m-keys #{:willa.core/aggregate-adder-fn
+                                                                :willa.core/aggregate-subtractor-fn
+                                                                :willa.core/aggregate-initial-value
+                                                                :willa.core/group-by-fn
+                                                                :willa.core/window}))
+               (empty? (clojure.set/difference #{:willa.core/group-by-fn
+                                                 :willa.core/aggregate-adder-fn
+                                                 :willa.core/aggregate-initial-value}
+                                               m-keys))
+               true)))))
 
 (s/def ::entity (s/multi-spec entity-spec :willa.core/entity-type))
 
@@ -120,41 +132,41 @@
                                   (map entities)
                                   (every? #(= :topic (:willa.core/entity-type %)))))]
     (s/with-gen
-      (s/and (s/keys :req-un [::workflow
-                              ::entities]
-                     :opt-un [::joins])
-             (fn all-entities-present? [{:keys [workflow entities]}]
-               (let [all-workflow-entities (->> workflow
-                                                flatten
-                                                set)
-                     all-entities          (->> entities
-                                                (map key)
-                                                set)]
-                 (clojure.set/subset? all-workflow-entities all-entities)))
-             all-roots-topics?
-             all-leaves-topics?)
-      (fn []
-        (let [workflow-gen           (s/gen ::workflow)
-              workflow->entities-gen (fn [workflow]
-                                       (let [workflow-keys (->> workflow
-                                                                flatten
-                                                                set)]
-                                         (s/gen ::entities {::entity-key #(s/gen workflow-keys)})))
-              workflow->joins-gen    (fn [workflow]
-                                       (let [workflow-graph  (wu/->graph workflow)
-                                             joined-entities (->> workflow-graph
-                                                                  l/nodes
-                                                                  (map #(l/predecessors workflow-graph %))
-                                                                  (map vec)
-                                                                  (filter #(< 1 (count %)))
-                                                                  set)]
-                                         (if (not-empty joined-entities)
-                                           (s/gen ::joins {::join-keys #(s/gen joined-entities)})
-                                           (gen/return {}))))]
-          (as-> workflow-gen $
-                (gen/bind $
-                          (fn [workflow]
-                            (gen/hash-map :workflow (gen/return workflow)
-                                          :entities (workflow->entities-gen workflow)
-                                          :joins (workflow->joins-gen workflow))))
-                (gen/such-that (every-pred all-roots-topics? all-leaves-topics?) $)))))))
+     (s/and (s/keys :req-un [::workflow
+                             ::entities]
+                    :opt-un [::joins])
+            (fn all-entities-present? [{:keys [workflow entities]}]
+              (let [all-workflow-entities (->> workflow
+                                               flatten
+                                               set)
+                    all-entities          (->> entities
+                                               (map key)
+                                               set)]
+                (clojure.set/subset? all-workflow-entities all-entities)))
+            all-roots-topics?
+            all-leaves-topics?)
+     (fn []
+       (let [workflow-gen           (s/gen ::workflow)
+             workflow->entities-gen (fn [workflow]
+                                      (let [workflow-keys (->> workflow
+                                                               flatten
+                                                               set)]
+                                        (s/gen ::entities {::entity-key #(s/gen workflow-keys)})))
+             workflow->joins-gen    (fn [workflow]
+                                      (let [workflow-graph  (wu/->graph workflow)
+                                            joined-entities (->> workflow-graph
+                                                                 l/nodes
+                                                                 (map #(l/predecessors workflow-graph %))
+                                                                 (map vec)
+                                                                 (filter #(< 1 (count %)))
+                                                                 set)]
+                                        (if (not-empty joined-entities)
+                                          (s/gen ::joins {::join-keys #(s/gen joined-entities)})
+                                          (gen/return {}))))]
+         (as-> workflow-gen $
+               (gen/bind $
+                         (fn [workflow]
+                           (gen/hash-map :workflow (gen/return workflow)
+                                         :entities (workflow->entities-gen workflow)
+                                         :joins (workflow->joins-gen workflow))))
+               (gen/such-that (every-pred all-roots-topics? all-leaves-topics?) $)))))))
