@@ -92,7 +92,7 @@ To do this, we'll create the entity config map. It looks like this:
 
 That's all the data Willa needs to build your topology! To get our topology up and running, we'll follow these steps:
 1. Create a `KStreamsBuilder` object
-2. Call the `willa.core/build-workflow!` function, passing it the builder, workflow, and entities
+2. Call the `willa.core/build-topology!` function, passing it the builder, workflow, and entities
 3. Create a `KafkaStreams` object from the builder
 4. Call `start` on it
 
@@ -110,7 +110,7 @@ The code looks like this:
 
 (defn start! []
   (let [builder   (doto (streams/streams-builder) ;; step 1
-                     (w/build-workflow! topology)) ;; step 2
+                     (w/build-topology! topology)) ;; step 2
          kstreams-app (streams/kafka-streams builder app-config) ;; step 3
          ]
     (streams/start kstreams-app) ;; step 4
