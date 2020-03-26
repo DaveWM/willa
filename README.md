@@ -74,7 +74,7 @@ To do this, we'll create the entity config map. It looks like this:
 ```clojure
 (def entities
   {:input-topic {::w/entity-type :topic
-                 :topic-name "output-topic"
+                 :topic-name "input-topic"
                  :replication-factor 1
                  :partition-count 1
                  :key-serde (serdes.edn/serde)
