@@ -94,7 +94,8 @@
             (::window entity) (ws/window-by (::window entity))
             (::aggregate-adder-fn entity) (ws/aggregate (::aggregate-initial-value entity)
                                                         (::aggregate-adder-fn entity)
-                                                        (::aggregate-subtractor-fn entity))
+                                                        (::aggregate-subtractor-fn entity)
+                                                        (str (hash parents)))
             true (ws/coerce-to-ktable)
             (::suppression entity) (ws/suppress (::suppression entity)))))
 
