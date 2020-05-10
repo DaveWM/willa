@@ -32,7 +32,7 @@
 
     (-> (streams/kstream builder input-topic)
         (streams/group-by-key)
-        (aggregate 0 (fn [acc [k v]] (+ acc v)) identity)
+        (aggregate 0 (fn [acc [k v]] (+ acc v)) identity "aggregate")
         (streams/to-kstream)
         (streams/to output-topic))
 

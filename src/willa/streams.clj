@@ -32,10 +32,10 @@
                                           default-serdes))))
 
 
-(defn aggregate [aggregatable initial-value adder-fn subtractor-fn]
-  (let [topic-config (merge {:topic-name (str (gensym))}
+(defn aggregate [aggregatable initial-value adder-fn subtractor-fn name]
+  (let [topic-config (merge {:topic-name name}
                             default-serdes)]
-    (if (instance? CljKGroupedTable aggregatable)
+   (if (instance? CljKGroupedTable aggregatable)
       (streams/aggregate
         aggregatable
         (constantly initial-value)
