@@ -1,4 +1,4 @@
-(defproject willa "0.1.2"
+(defproject willa "0.1.3"
   :description "A Clojure DSL for Kafka Streams"
   :url "http://example.com/FIXME"
   :license {:name "GPL V3"
