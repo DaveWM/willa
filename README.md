@@ -202,7 +202,8 @@ The code looks like this:
 | Key | Description |
 | --- | --- |
 | `:willa.core/join-type` | The type of the join. Can be one of `:merge`, `:left`, `:inner` or `:outer`.|
-| `:willa.core/window` | A [JoinWindows](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/JoinWindows.html) object that specifies the windowing to be used in the join. Not used when the join type is `:merge` |     
+| `:willa.core/window` | A [JoinWindows](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/JoinWindows.html) object that specifies the windowing to be used in the join. Not used when the join type is `:merge` or when one of the join objects is a `:global-ktable` |     
+| `:willa.core/kv-mapper` | The [kv-mapper function](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KeyValueMapper.html) to use when joining a `:kstream` with a `:global-ktable`. Extracts a key of the GlobalKTable from each `[k v]` of the stream. If not specified, the key of the stream is used. Not used when joining other kinds of objects. See [the Kafka Streams docs](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KStream.html#join-org.apache.kafka.streams.kstream.GlobalKTable-org.apache.kafka.streams.kstream.KeyValueMapper-org.apache.kafka.streams.kstream.ValueJoiner-) for more info |     
 
 ## License
 

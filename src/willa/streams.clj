@@ -97,13 +97,13 @@
 
 (defmethod join*
   [:inner CljKStream CljGlobalKTable]
-  [_ kstream global-ktable join-fn]
-  (streams/join-global kstream global-ktable (fn [[k v]] k) join-fn))
+  [{kv-mapper :willa.core/kv-mapper, :or {kv-mapper first}} kstream global-ktable join-fn]
+  (streams/join-global kstream global-ktable kv-mapper join-fn))
 
 (defmethod join*
   [:left CljKStream CljGlobalKTable]
-  [_ kstream global-ktable join-fn]
-  (streams/left-join-global kstream global-ktable (fn [[k v]] k) join-fn))
+  [{kv-mapper :willa.core/kv-mapper, :or {kv-mapper first}} kstream global-ktable join-fn]
+  (streams/left-join-global kstream global-ktable kv-mapper join-fn))
 
 
 (defn join
