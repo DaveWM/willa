@@ -1,7 +1,7 @@
 (ns willa.streams
   (:require [jackdaw.streams :as streams]
             [jackdaw.serdes.edn :as serdes.edn])
-  (:import (jackdaw.streams.interop CljKTable CljKStream CljKGroupedTable)
+  (:import (jackdaw.streams.interop CljKTable CljKStream CljKGroupedTable CljGlobalKTable)
            (org.apache.kafka.streams.kstream Transformer SessionWindows TimeWindows KTable)
            (org.apache.kafka.streams.processor ProcessorContext)))
 
@@ -94,6 +94,16 @@
   [:left CljKStream CljKTable]
   [_ kstream ktable join-fn]
   (streams/left-join kstream ktable join-fn default-serdes default-serdes))
+
+(defmethod join*
+  [:inner CljKStream CljGlobalKTable]
+  [_ kstream global-ktable join-fn]
+  (streams/join-global kstream global-ktable (fn [[k v]] k) join-fn))
+
+(defmethod join*
+  [:left CljKStream CljGlobalKTable]
+  [_ kstream global-ktable join-fn]
+  (streams/left-join-global kstream global-ktable (fn [[k v]] k) join-fn))
 
 
 (defn join

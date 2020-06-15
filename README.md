@@ -186,7 +186,7 @@ The code looks like this:
 ### Entity Config
 | Key | Required? | Valid Entity Types | Description |
 | --- | --- | --- | --- |
-| `:willa.core/entity-type` | ☑ | All | The type of the entity. Can be one of: `:topic`, `:kstream`, or `:ktable`| 
+| `:willa.core/entity-type` | ☑ | All | The type of the entity. Can be one of: `:topic`, `:kstream`, `:ktable`, or `:global-ktable`| 
 | `:topic-name` | ☑ | `:topic` | The name of the topic |
 | `:key-serde` | ☑ | `:topic` | The serde to use to serialize/deserialize the keys of records on the topic |
 | `:value-serde` | ☑ | `:topic` | The serde to use to serialize/deserialize the values of records on the topic |

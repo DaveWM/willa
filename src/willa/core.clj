@@ -100,6 +100,18 @@
             (::suppression entity) (ws/suppress (::suppression entity)))))
 
 
+(defmethod build-kstreams-object :global-ktable [entity builder parents entities joins]
+  (if (wu/single-elem? parents)
+    (let [parent (first parents)
+          parent-type (::entity-type parent)]
+      (if (= :topic parent-type)
+        (streams/global-ktable builder parent)
+        (throw (ex-info (str "GlobalKTable's source must be a :topic and not a " parent-type)
+                        {:entity entity :parents parents}))))
+    (throw (ex-info "GlobalKTable can only have one source (i.e. no joins)"
+                    {:entity entity :parents parents}))))
+
+
 
 (defn- build-topology!* [builder {:keys [workflow entities joins]} overrides]
   (let [g (wu/->graph workflow)]
