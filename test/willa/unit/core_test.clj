@@ -80,3 +80,58 @@
                                  (= 1 (count (get-in journal [:topics "output"])))))
 
         {:output-topic [{:key "k" :value 1}]})))
+
+(deftest global-ktable-topology-tests
+  (is (u/results-congruous?
+       [:output-topic]
+       (u/run-tm-for-workflow {:workflow [[:input-topic :joined-stream]
+                                          [:table-input-topic :global-table]
+                                          [:global-table :joined-stream]
+                                          [:joined-stream :output-topic]]
+                               :entities {:input-topic (u/->topic "input")
+                                          :table-input-topic (u/->topic "table-input")
+                                          :global-table {:willa.core/entity-type :global-ktable}
+                                          :joined-stream {:willa.core/entity-type :kstream}
+                                          :output-topic (u/->topic "output")}
+                               :joins {[:input-topic :global-table] {:willa.core/join-type :inner}}}
+                              {:input-topic [{:key "k" :value 1 :timestamp 100}]
+                               :table-input-topic [{:key "k" :value 2 :timestamp 0}]}
+                              (fn [journal]
+                                (= 1 (count (get-in journal [:topics "output"])))))
+       {:output-topic [{:key "k" :value [1 2]}]}))
+
+  (is (u/results-congruous?
+       [:output-topic]
+       (u/run-tm-for-workflow {:workflow [[:input-topic :joined-stream]
+                                          [:table-input-topic :global-table]
+                                          [:global-table :joined-stream]
+                                          [:joined-stream :output-topic]]
+                               :entities {:input-topic (u/->topic "input")
+                                          :table-input-topic (u/->topic "table-input")
+                                          :global-table {:willa.core/entity-type :global-ktable}
+                                          :joined-stream {:willa.core/entity-type :kstream}
+                                          :output-topic (u/->topic "output")}
+                               :joins {[:input-topic :global-table] {:willa.core/join-type :left}}}
+                              {:input-topic [{:key "k" :value 1 :timestamp 100} {:key "k2" :value 1 :timestamp 101}]
+                               :table-input-topic [{:key "k2" :value 2 :timestamp 0}]}
+                              (fn [journal]
+                                (= 2 (count (get-in journal [:topics "output"])))))
+       {:output-topic [{:key "k" :value [1 nil]} {:key "k2" :value [1 2]}]}))
+  (is (u/results-congruous?
+       [:output-topic]
+       (u/run-tm-for-workflow {:workflow [[:input-topic :joined-stream]
+                                          [:table-input-topic :global-table]
+                                          [:global-table :joined-stream]
+                                          [:joined-stream :output-topic]]
+                               :entities {:input-topic (u/->topic "input")
+                                          :table-input-topic (u/->topic "table-input")
+                                          :global-table {:willa.core/entity-type :global-ktable}
+                                          :joined-stream {:willa.core/entity-type :kstream}
+                                          :output-topic (u/->topic "output")}
+                               :joins {[:input-topic :global-table] {:willa.core/join-type :left
+                                                                     :willa.core/kv-mapper (fn [[k v]] (str k v))}}}
+                              {:input-topic [{:key "k" :value 1 :timestamp 100} {:key "k2" :value 1 :timestamp 101}]
+                               :table-input-topic [{:key "k1" :value 2 :timestamp 0}]}
+                              (fn [journal]
+                                (= 2 (count (get-in journal [:topics "output"])))))
+       {:output-topic [{:key "k" :value [1 2]} {:key "k2" :value [1 nil]}]})))

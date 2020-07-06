@@ -49,6 +49,9 @@
 (defmethod ->joinable :ktable [builder entity]
   (entity->ktable builder entity))
 
+(defmethod ->joinable :global-ktable [builder entity]
+  (::kstreams-object entity))
+
 
 (def ->groupable ->joinable)
 
@@ -98,6 +101,18 @@
                                                         (str (hash parents)))
             true (ws/coerce-to-ktable)
             (::suppression entity) (ws/suppress (::suppression entity)))))
+
+
+(defmethod build-kstreams-object :global-ktable [entity builder parents entities joins]
+  (if (wu/single-elem? parents)
+    (let [parent (get entities (first parents))
+          parent-type (::entity-type parent)]
+      (if (= :topic parent-type)
+        (streams/global-ktable builder parent)
+        (throw (ex-info (str "GlobalKTable's source must be a :topic and not a " (or parent-type "nil"))
+                        {:entity entity :parents parents}))))
+    (throw (ex-info "GlobalKTable can only have one source (i.e. no joins)"
+                    {:entity entity :parents parents}))))
 
 
 
