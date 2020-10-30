@@ -99,7 +99,7 @@
                                                         (::aggregate-adder-fn entity)
                                                         (::aggregate-subtractor-fn entity)
                                                         (str (hash parents)))
-            true (ws/coerce-to-ktable)
+            true (ws/coerce-to-ktable (select-keys entity [:store-name]))
             (::suppression entity) (ws/suppress (::suppression entity)))))
 
 
