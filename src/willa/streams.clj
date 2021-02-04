@@ -29,21 +29,16 @@
 (defmethod coerce-to-ktable* CljKStream [kstream topic-config]
   (-> kstream
       (streams/group-by-key default-serdes)
-      (streams/reduce (fn [_ x] x) 
+      (streams/reduce (fn [_ x] x)
                       topic-config)))
 
-(def default-state-store-config
-  (assoc default-serdes :store-name (str (gensym))))
-
 (defn coerce-to-ktable
-  ([kstreams-object] 
-   (coerce-to-ktable kstreams-object 
-                     default-state-store-config))
-  ([kstreams-object {:keys [store-name] :as state-store-config}]
+  ([kstreams-object]
+   (coerce-to-ktable kstreams-object {}))
+  ([kstreams-object {:keys [::store-name] :as entity}]
    (coerce-to-ktable* kstreams-object
-                      (-> default-state-store-config
-                          (merge state-store-config)
-                          (set/rename-keys {:store-name :topic-name})))))
+                      (-> default-serdes
+                          (assoc :topic-name (or store-name (str (gensym))))))))
 
 (defn aggregate [aggregatable initial-value adder-fn subtractor-fn name]
   (let [topic-config (merge {:topic-name name}
