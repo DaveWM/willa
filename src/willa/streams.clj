@@ -1,6 +1,7 @@
 (ns willa.streams
   (:require [jackdaw.streams :as streams]
-            [jackdaw.serdes.edn :as serdes.edn])
+            [jackdaw.serdes.edn :as serdes.edn]
+            [clojure.set :as set])
   (:import (jackdaw.streams.interop CljKTable CljKStream CljKGroupedTable CljGlobalKTable)
            (org.apache.kafka.streams.kstream Transformer SessionWindows TimeWindows KTable)
            (org.apache.kafka.streams.processor ProcessorContext)))
@@ -20,17 +21,29 @@
   kstream)
 
 
-(defmulti coerce-to-ktable class)
+(defmulti coerce-to-ktable* (fn [kstreams-object topic-config] (class kstreams-object)))
 
-(defmethod coerce-to-ktable CljKTable [ktable]
+(defmethod coerce-to-ktable* CljKTable [ktable _]
   ktable)
 
-(defmethod coerce-to-ktable CljKStream [kstream]
+(defmethod coerce-to-ktable* CljKStream [kstream topic-config]
   (-> kstream
       (streams/group-by-key default-serdes)
-      (streams/reduce (fn [_ x] x) (merge {:topic-name (str (gensym))}
-                                          default-serdes))))
+      (streams/reduce (fn [_ x] x) 
+                      topic-config)))
 
+(def default-state-store-config
+  (assoc default-serdes :store-name (str (gensym))))
+
+(defn coerce-to-ktable
+  ([kstreams-object] 
+   (coerce-to-ktable kstreams-object 
+                     default-state-store-config))
+  ([kstreams-object {:keys [store-name] :as state-store-config}]
+   (coerce-to-ktable* kstreams-object
+                      (-> default-state-store-config
+                          (merge state-store-config)
+                          (set/rename-keys {:store-name :topic-name})))))
 
 (defn aggregate [aggregatable initial-value adder-fn subtractor-fn name]
   (let [topic-config (merge {:topic-name name}
