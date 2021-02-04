@@ -30,32 +30,35 @@
                               (map (juxt identity (partial l/successors g)))
                               (remove (fn [[n successors]] (nil? successors)))
                               (into {}))]
-     (-> (rd/graph->dot nodes nodes->adjacent
-                        :node->descriptor (fn [n]
-                                            (let [{:keys [willa.core/entity-type willa.experiment/output] :as entity} (get entities n)]
-                                              (merge
-                                                {:label (if output
-                                                          (str n "\n\n" (prn-str output))
-                                                          n)
-                                                 :color "black"
-                                                 :fillcolor (entity-type->colour entity-type)
-                                                 :style "filled"
-                                                 :penwidth 1.3
-                                                 :height 0.7
-                                                 :width 0.9
-                                                 :shape (entity-type->shape entity-type)}
-                                                (node-descriptor-fn n entity))))
-                        :node->cluster (fn [n]
-                                         (when show-joins
-                                           (->> joins
-                                                (filter (fn [[ns _]]
-                                                          (contains? (set ns) n)))
-                                                ffirst)))
-                        :cluster->descriptor (fn [c]
-                                               (let [join-config (get joins c)]
-                                                 (merge {:label (::w/join-type join-config)}
-                                                        (cluster-descriptor-fn c (map entities c) join-config)))))
-         (r/dot->image)))))
+     (try
+       (-> (rd/graph->dot nodes nodes->adjacent
+                          :node->descriptor (fn [n]
+                                              (let [{:keys [willa.core/entity-type willa.experiment/output] :as entity} (get entities n)]
+                                                (merge
+                                                  {:label (if output
+                                                            (str n "\n\n" (prn-str output))
+                                                            n)
+                                                   :color "black"
+                                                   :fillcolor (entity-type->colour entity-type)
+                                                   :style "filled"
+                                                   :penwidth 1.3
+                                                   :height 0.7
+                                                   :width 0.9
+                                                   :shape (entity-type->shape entity-type)}
+                                                  (node-descriptor-fn n entity))))
+                          :node->cluster (fn [n]
+                                           (when show-joins
+                                             (->> joins
+                                                  (filter (fn [[ns _]]
+                                                            (contains? (set ns) n)))
+                                                  ffirst)))
+                          :cluster->descriptor (fn [c]
+                                                 (let [join-config (get joins c)]
+                                                   (merge {:label (::w/join-type join-config)}
+                                                          (cluster-descriptor-fn c (map entities c) join-config)))))
+           (r/dot->image))
+       (catch RuntimeException e
+         (throw (Exception. "Viewing a topology requires graphviz to be installed, instructions here: https://bit.ly/2MPXzSO")))))))
 
 
 (def view-topology (comp r/view-image make-image))

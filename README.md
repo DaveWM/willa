@@ -149,8 +149,9 @@ You can verify that it works by running the following commands in your repl:
 
 ## Going Further
 
-One of the cool features of Willa is that you can visualise your topology. 
-To do this, run these commands in your repl:
+One of the cool features of Willa is that you can visualise your topology.
+To do this, first make sure you have [graphviz installed](https://bit.ly/2MPXzSO), 
+then run these commands in your repl:
 
 ```clojure
 (require 'willa.viz)
