@@ -1,6 +1,6 @@
-(defproject willa "0.1.4"
+(defproject willa "0.2.0"
   :description "A Clojure DSL for Kafka Streams"
-  :url "http://example.com/FIXME"
+  :url "https://github.com/DaveWM/willa"
   :license {:name "GPL V3"
             :url "https://www.gnu.org/licenses/gpl-3.0.en.html"}
   :dependencies [[org.clojure/clojure "1.10.0"]
