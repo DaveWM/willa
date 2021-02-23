@@ -49,7 +49,8 @@ The topology would look like this:
 
 ![Simple Topology](resources/simple-topology.png)
 
-Start by adding `[willa "0.1.0"]` to your `project.clj`.
+Start by adding willa to your `project.clj` or `deps.edn`. Check the latest version on Clojars or in the badge at the top of this readme.
+
 Next, we'll require some necessary namespaces:
 
 ```clojure
