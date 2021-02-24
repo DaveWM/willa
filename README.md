@@ -191,6 +191,7 @@ The code looks like this:
 | `:topic-name` | ☑ | `:topic` | The name of the topic |
 | `:key-serde` | ☑ | `:topic` | The serde to use to serialize/deserialize the keys of records on the topic |
 | `:value-serde` | ☑ | `:topic` | The serde to use to serialize/deserialize the values of records on the topic |
+| `:willa.streams/store-name` | ❌ | `:ktable` | The name to give to the state store |
 | `:willa.core/xform` | ❌ | `:kstream` | A transducer to apply to the `KStream`|
 | `:willa.core/group-by-fn` | ❌ | `:ktable` | A function which takes a key-value pair, and returns the key of the group. If this key is present, `:willa.core/aggregate-adder-fn` and `:willa.core/aggregate-initial-value` must also be provided.|
 | `:willa.core/window` | ❌ | `:ktable` | The windowing to apply after grouping the input records. Should be either a [Windows](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/Windows.html) or a [SessionWindows](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/SessionWindows.html) object. If this key is present, `:willa.core/group-by` must also be provided. Will cause the input to be coerced to a `KStream`|
