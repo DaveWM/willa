@@ -31,7 +31,7 @@
   (streams/ktable builder entity))
 
 (defmethod entity->ktable :kstream [_ entity]
-  (ws/coerce-to-ktable (::kstreams-object entity)))
+  (ws/coerce-to-ktable (::kstreams-object entity) entity))
 
 (defmethod entity->ktable :ktable [_ entity]
   (::kstreams-object entity))
@@ -90,7 +90,9 @@
 (defmethod build-kstreams-object :ktable [entity builder parents entities joins]
   (let [ktable-or-kstream (if (wu/single-elem? parents)
                             (->groupable builder (get entities (first parents)))
-                            (join-entities builder (get-join joins parents) entities))]
+                            (join-entities builder (get-join joins parents) entities))
+        store-name (or (::store-name entity)
+                       (str (hash parents)))]
     (cond-> ktable-or-kstream
             (::window entity) (ws/coerce-to-kstream)
             (::group-by-fn entity) (streams/group-by (::group-by-fn entity) ws/default-serdes)
@@ -98,7 +100,7 @@
             (::aggregate-adder-fn entity) (ws/aggregate (::aggregate-initial-value entity)
                                                         (::aggregate-adder-fn entity)
                                                         (::aggregate-subtractor-fn entity)
-                                                        (str (hash parents)))
+                                                        store-name)
             true (ws/coerce-to-ktable entity)
             (::suppression entity) (ws/suppress (::suppression entity)))))
 

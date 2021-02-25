@@ -21,27 +21,23 @@
   kstream)
 
 
-(defmulti coerce-to-ktable* (fn [kstreams-object topic-config] (class kstreams-object)))
+(defmulti coerce-to-ktable (fn [kstreams-object entity] (class kstreams-object)))
 
-(defmethod coerce-to-ktable* CljKTable [ktable _]
-  ktable)
+(defmethod coerce-to-ktable CljKTable [ktable {:keys [:willa.core/store-name] :as config}]
+  (if (or (nil? store-name)
+          (= store-name (.queryableStoreName (streams/ktable* ktable))))
+    ktable
+    (coerce-to-ktable (streams/to-kstream ktable) config)))
 
-(defmethod coerce-to-ktable* CljKStream [kstream topic-config]
+(defmethod coerce-to-ktable CljKStream [kstream {:keys [:willa.core/store-name] :as config}]
   (-> kstream
       (streams/group-by-key default-serdes)
       (streams/reduce (fn [_ x] x)
-                      topic-config)))
-
-(defn coerce-to-ktable
-  ([kstreams-object]
-   (coerce-to-ktable kstreams-object {}))
-  ([kstreams-object {:keys [::store-name] :as entity}]
-   (coerce-to-ktable* kstreams-object
                       (-> default-serdes
                           (assoc :topic-name (or store-name (str (gensym))))))))
 
-(defn aggregate [aggregatable initial-value adder-fn subtractor-fn name]
-  (let [topic-config (merge {:topic-name name}
+(defn aggregate [aggregatable initial-value adder-fn subtractor-fn store-name]
+  (let [topic-config (merge {:topic-name store-name}
                             default-serdes)]
    (if (instance? CljKGroupedTable aggregatable)
       (streams/aggregate

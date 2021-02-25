@@ -20,9 +20,16 @@
   (let [builder           (streams/streams-builder)
         mock-topic-config {:topic-name "mock"}]
     (are [input]
-      (instance? CljKTable (coerce-to-ktable input))
+      (let [result (coerce-to-ktable input {:willa.core/store-name "store"})]
+        (and (instance? CljKTable result)
+             (= "store" (.queryableStoreName (streams/ktable* result)))))
       (streams/kstream builder mock-topic-config)
-      (streams/ktable builder mock-topic-config))))
+      (streams/ktable builder mock-topic-config)
+      (streams/ktable builder {:topic-name "store"}))
+    (let [ktable (streams/ktable builder {:topic-name "mock"})
+          result (coerce-to-ktable ktable {})]
+      (is (instance? CljKTable result))
+      (is (= "mock" (.queryableStoreName (streams/ktable* result)))))))
 
 
 (deftest aggregate-test
