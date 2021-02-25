@@ -198,6 +198,7 @@ The code looks like this:
 | `:willa.core/aggregate-adder-fn` | ❌ | `:ktable` | The aggregator function if the input is a `KStream`, or the ["adder" function](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KGroupedTable.html#aggregate-org.apache.kafka.streams.kstream.Initializer-org.apache.kafka.streams.kstream.Aggregator-org.apache.kafka.streams.kstream.Aggregator) if it is a `KTable`. If this key is present, `:willa.core/group-by` must also be provided.|
 | `:willa.core/aggregate-subtractor-fn` | ❌ | `:ktable` | The aggregate ["subtractor" function](https://kafka.apache.org/20/javadoc/org/apache/kafka/streams/kstream/KGroupedTable.html#aggregate-org.apache.kafka.streams.kstream.Initializer-org.apache.kafka.streams.kstream.Aggregator-org.apache.kafka.streams.kstream.Aggregator-), only valid if the input is a `KTable`. If this key is present, `:willa.core/group-by` must also be provided.|
 | `:willa.core/suppression` | ❌ | `:ktable` | A [Suppressed](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/Suppressed.html) object that determines how updates to the `KTable` are emitted. See [the Kafka Streams docs](https://docs.confluent.io/current/streams/javadocs/org/apache/kafka/streams/kstream/KTable.html#suppress-org.apache.kafka.streams.kstream.Suppressed-) for more info|
+| `:willa.core/store-name`  | ❌ | `:ktable` | The local state store name to use for the KTable. |
 
 ### Join Config
 | Key | Description |
