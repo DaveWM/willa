@@ -17,13 +17,7 @@
   [builder]
   (let [topology (-> (streams/streams-builder* builder)
                      (.build))]
-    (TopologyTestDriver. topology
-                         (doto (Properties.)
-                           (.put "application.id"      (str (java.util.UUID/randomUUID)))
-                           (.put "bootstrap.servers"   "fake")
-                           (.put "default.key.serde"   "jackdaw.serdes.EdnSerde")
-                           (.put "default.value.serde" "jackdaw.serdes.EdnSerde"))
-                         0)))
+    (TopologyTestDriver. topology)))
 
 (defn ->topic [name]
   (merge {:topic-name name
