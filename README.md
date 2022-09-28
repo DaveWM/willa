@@ -1,6 +1,4 @@
 # willa [![CircleCI](https://circleci.com/gh/DaveWM/willa.svg?style=svg)](https://circleci.com/gh/DaveWM/willa) [![Clojars Project](https://img.shields.io/clojars/v/willa.svg)](https://clojars.org/willa)
-**Alpha**
-
 
 Willa provides a data-driven DSL on top of the [Kafka Streams DSL](https://docs.confluent.io/current/streams/developer-guide/dsl-api.html), inspired by [Onyx](http://www.onyxplatform.org). It uses [Jackdaw](https://github.com/FundingCircle/jackdaw) under the hood.
 
