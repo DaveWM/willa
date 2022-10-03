@@ -1,14 +1,16 @@
 (ns willa.streams
   (:require [jackdaw.streams :as streams]
             [jackdaw.serdes.edn :as serdes.edn]
+            [jackdaw.streams.lambdas]
+            [jackdaw.streams.interop]
             [clojure.set :as set])
   (:import (jackdaw.streams.interop CljKTable CljKStream CljKGroupedTable CljGlobalKTable)
-           (org.apache.kafka.streams.kstream Transformer SessionWindows TimeWindows KTable)
+           (org.apache.kafka.streams.kstream Transformer SessionWindows TimeWindows KTable ValueTransformerWithKey KStream ValueTransformerWithKeySupplier)
            (org.apache.kafka.streams.processor ProcessorContext)))
 
 
 (def default-serdes
-  {:key-serde (serdes.edn/serde)
+  {:key-serde   (serdes.edn/serde)
    :value-serde (serdes.edn/serde)})
 
 
@@ -39,7 +41,7 @@
 (defn aggregate [aggregatable initial-value adder-fn subtractor-fn store-name]
   (let [topic-config (merge {:topic-name store-name}
                             default-serdes)]
-   (if (instance? CljKGroupedTable aggregatable)
+    (if (instance? CljKGroupedTable aggregatable)
       (streams/aggregate
         aggregatable
         (constantly initial-value)
@@ -121,24 +123,41 @@
           others)))
 
 
-(deftype TransducerTransformer [xform ^{:volatile-mutable true} context]
+(deftype TransducerTransformer [xform]
   Transformer
-  (init [_ c]
-    (set! context c))
+  (init [_ _context])
   (transform [_ k v]
-    (let [rf (fn
-               ([context] context)
-               ([^ProcessorContext context [k v]]
-                (.forward context k v)
-                (.commit context)
-                context))]
-      ((xform rf) context [k v]))
-    nil)
+    (->> ((xform conj) [] [k v])
+         (map jackdaw.streams.lambdas/key-value)))
+  (close [_]))
+
+
+(deftype ValueTransducerTransformer [xform]
+  ValueTransformerWithKey
+  (init [_ _context])
+  (transform [_ k v]
+    (->> ((xform conj) [] [k v])
+         (map second)))
   (close [_]))
 
 
 (defn transduce-stream [kstream xform]
-  (streams/transform kstream #(TransducerTransformer. xform nil)))
+  (streams/flat-transform kstream #(TransducerTransformer. xform)))
+
+
+(defn- flat-transform-values
+  [kstream value-transformer-supplier-fn]
+  (jackdaw.streams.interop/clj-kstream
+    (.flatTransformValues ^KStream (jackdaw.streams/kstream* kstream)
+                          ^ValueTransformerWithKeySupplier (reify
+                                                             ValueTransformerWithKeySupplier
+                                                             (get [_this]
+                                                               (value-transformer-supplier-fn)))
+                          ^"[Ljava.lang.String;" (into-array String []))))
+
+
+(defn transduce-stream-values [kstream xform]
+  (flat-transform-values kstream #(ValueTransducerTransformer. xform)))
 
 (defn window-by [kgroupedstream window]
   (cond

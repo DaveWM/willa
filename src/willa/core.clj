@@ -84,7 +84,8 @@
                   (-> (join-entities builder (get-join joins parents) entities)
                       ws/coerce-to-kstream))]
     (cond-> kstream
-            (::xform entity) (ws/transduce-stream (::xform entity)))))
+            (::xform entity) ((if (:willa.overrides/prevent-repartition entity) ws/transduce-stream-values ws/transduce-stream)
+                              (::xform entity)))))
 
 
 (defmethod build-kstreams-object :ktable [entity builder parents entities joins]

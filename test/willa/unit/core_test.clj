@@ -79,7 +79,22 @@
                                (fn [journal]
                                  (= 1 (count (get-in journal [:topics "output"])))))
 
-        {:output-topic [{:key "k" :value 1}]})))
+        {:output-topic [{:key "k" :value 1}]}))
+
+  (is (u/results-congruous?
+        [:output-topic]
+        (u/run-tm-for-workflow {:workflow [[:input-topic :stream]
+                                           [:stream :output-topic]]
+                                :entities {:input-topic (u/->topic "input")
+                                           :output-topic (u/->topic "output")
+                                           :stream {:willa.core/entity-type :kstream
+                                                    :willa.core/xform (map (fn [[k v]] ["new key" (inc v)]))
+                                                    :willa.overrides/prevent-repartition true}}}
+                               {:input-topic [{:key "k" :value 1 :timestamp 100}]}
+                               (fn [journal]
+                                 (= 1 (count (get-in journal [:topics "output"])))))
+
+        {:output-topic [{:key "k" :value 2}]})))
 
 (deftest global-ktable-topology-tests
   (is (u/results-congruous?

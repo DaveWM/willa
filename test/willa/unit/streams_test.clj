@@ -66,7 +66,9 @@
         output-topic (u/->topic "output")]
 
     (-> (streams/kstream builder input-topic)
-        (transduce-stream (map (wu/transform-value inc)))
+        (transduce-stream (mapcat (fn [[k v]]
+                                    [[k (inc v)]
+                                     [k (dec v)]])))
         (streams/to output-topic))
 
     (is
@@ -79,6 +81,33 @@
                       :output-topic (u/->topic "output")}}
           {:input-topic [{:key "k" :value 1 :timestamp 100}]}
           (fn [journal]
-            (= 1 (count (get-in journal [:topics "output"])))))
+            (= 2 (count (get-in journal [:topics "output"])))))
 
-        {:output-topic [{:key "k" :value 2}]}))))
+        {:output-topic [{:key "k" :value 2}
+                        {:key "k" :value 0}]})))
+
+  (testing "without a repartition"
+    (let [builder (streams/streams-builder)
+          input-topic (u/->topic "input")
+          output-topic (u/->topic "output")]
+
+      (-> (streams/kstream builder input-topic)
+          (transduce-stream-values (mapcat (fn [[k v]]
+                                      [[k (inc v)]
+                                       [k (dec v)]])))
+          (streams/to output-topic))
+
+      (is
+        (u/results-congruous?
+          [:output-topic]
+
+          (u/run-test-machine
+            builder
+            {:entities {:input-topic  input-topic
+                        :output-topic (u/->topic "output")}}
+            {:input-topic [{:key "k" :value 1 :timestamp 100}]}
+            (fn [journal]
+              (= 2 (count (get-in journal [:topics "output"])))))
+
+          {:output-topic [{:key "k" :value 2}
+                          {:key "k" :value 0}]})))))
