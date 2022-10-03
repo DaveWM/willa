@@ -4,7 +4,7 @@
   :license {:name "GPL V3"
             :url "https://www.gnu.org/licenses/gpl-3.0.en.html"}
   :dependencies [[org.clojure/clojure "1.10.3"]
-                 [fundingcircle/jackdaw "0.8.0"]
+                 [fundingcircle/jackdaw "0.9.6"]
                  [aysylu/loom "1.0.2"]
                  [rhizome "0.2.9"]
                  [org.clojure/math.combinatorics "0.1.6"]]
